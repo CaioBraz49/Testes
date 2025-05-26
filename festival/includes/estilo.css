@@ -1,0 +1,37 @@
+body {
+    display: grid;
+    grid-template-rows: auto 1fr auto; /* Cabeçalho, Conteúdo, Rodapé */
+    min-height: 100vh;
+}
+
+header {
+    grid-row: 1;
+}
+
+.content-wrapper {
+    grid-row: 2;
+}
+
+.rodape {
+    grid-row: 3;
+}
+
+/* Para o cabeçalho "Acesso ao Sistema" */
+.card-header-custom-purple {
+  background-color: #6f42c1 !important; /* Cor roxa */
+  color: white; /* Mantém o texto branco, como no original */
+}
+
+/* Para o botão "Entrar" */
+.btn-custom-purple {
+  background-color: #6f42c1 !important; /* Cor roxa */
+  border-color: #6f42c1 !important;   /* Cor da borda roxa */
+  color: white;                       /* Cor do texto branca */
+}
+
+/* Opcional: Estilo para quando o mouse passa por cima do botão */
+.btn-custom-purple:hover {
+  background-color: #59369b !important; /* Um tom de roxo mais escuro */
+  border-color: #53338d !important;   /* Cor da borda mais escura */
+  color: white;
+}

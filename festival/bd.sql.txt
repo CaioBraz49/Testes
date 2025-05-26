@@ -1,0 +1,214 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Tempo de geração: 24/05/2025 às 20:34
+-- Versão do servidor: 10.4.32-MariaDB
+-- Versão do PHP: 8.2.12
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Banco de dados: `sicalis_festival`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `avaliacoes`
+--
+
+CREATE TABLE `avaliacoes` (
+  `id` int(11) NOT NULL,
+  `id_user` int(11) NOT NULL,
+  `id_video` int(11) NOT NULL,
+  `conceitos_corretos` tinyint(1) DEFAULT NULL,
+  `comentario_conceitos` text DEFAULT NULL,
+  `tempo_respeitado` tinyint(1) DEFAULT NULL,
+  `comentario_tempo` text DEFAULT NULL,
+  `possui_titulo` tinyint(1) DEFAULT NULL,
+  `comentario_titulo` text DEFAULT NULL,
+  `possui_creditos` tinyint(1) DEFAULT NULL,
+  `comentario_creditos` text DEFAULT NULL,
+  `discurso_adequado` tinyint(1) DEFAULT NULL,
+  `comentario_discurso` text DEFAULT NULL,
+  `audio_qualidade` tinyint(1) DEFAULT NULL,
+  `comentario_audio` text DEFAULT NULL,
+  `imagem_qualidade` tinyint(1) DEFAULT NULL,
+  `comentario_imagem` text DEFAULT NULL,
+  `edicao_correta` tinyint(1) DEFAULT NULL,
+  `comentario_edicao` text DEFAULT NULL,
+  `portugues_correto` tinyint(1) DEFAULT NULL,
+  `comentario_portugues` text DEFAULT NULL,
+  `parecer` enum('aprovado','reprovado','correcao','terceiro') NOT NULL,
+  `justificativa` text DEFAULT NULL,
+  `data_avaliacao` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Despejando dados para a tabela `avaliacoes`
+--
+
+INSERT INTO `avaliacoes` (`id`, `id_user`, `id_video`, `conceitos_corretos`, `comentario_conceitos`, `tempo_respeitado`, `comentario_tempo`, `possui_titulo`, `comentario_titulo`, `possui_creditos`, `comentario_creditos`, `discurso_adequado`, `comentario_discurso`, `audio_qualidade`, `comentario_audio`, `imagem_qualidade`, `comentario_imagem`, `edicao_correta`, `comentario_edicao`, `portugues_correto`, `comentario_portugues`, `parecer`, `justificativa`, `data_avaliacao`) VALUES
+(5, 2, 1, 1, '', 1, '', 1, '', 1, '', 1, '', 0, 'Em alguns momentos o som não é claro', 1, '', 1, '', 1, '', 'aprovado', 'Classificado', '2025-05-19 18:49:18'),
+(6, 2, 2, 1, '', 1, '', 1, '', 1, '', 1, '', 1, '', 0, '', 1, '', 0, '', 'aprovado', 'aprovado', '2025-05-23 20:27:35'),
+(7, 3, 1, 1, '', 0, 'erro ', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 'correcao', 'erro', '2025-05-23 20:32:20'),
+(8, 3, 2, 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 'aprovado', 'ok', '2025-05-23 21:31:52');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `options`
+--
+
+CREATE TABLE `options` (
+  `id` int(11) NOT NULL,
+  `option_name` varchar(200) NOT NULL,
+  `option_value` text NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+
+--
+-- Despejando dados para a tabela `options`
+--
+
+INSERT INTO `options` (`id`, `option_name`, `option_value`) VALUES
+(1, 'limite_videos', '8');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `users`
+--
+
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL,
+  `nome` varchar(100) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `senha` varchar(255) NOT NULL,
+  `categoria` text NOT NULL,
+  `tipo` enum('admin','avaliador') NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Despejando dados para a tabela `users`
+--
+
+INSERT INTO `users` (`id`, `nome`, `email`, `senha`, `categoria`, `tipo`, `created_at`) VALUES
+(1, 'Valci', 'valcibalbino@gmail.com', '12345', '1', 'admin', '2025-05-18 01:22:24'),
+(2, 'João', 'joao@sicalis.com.br', '123', 'comunidade_geral,graduandos_matematica', 'avaliador', '2025-05-18 01:22:24'),
+(3, 'Maria', 'maria@sicalis.com.br', '123', 'povos_originarios', 'avaliador', '2025-05-18 01:22:24'),
+(4, 'Pamella', 'pamella@sicalis.com.br', '123', 'admin', 'admin', '2025-05-18 01:22:24');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `videos`
+--
+
+CREATE TABLE `videos` (
+  `id` int(11) NOT NULL,
+  `titulo` varchar(200) NOT NULL,
+  `tema` varchar(100) NOT NULL,
+  `descricao` text DEFAULT NULL,
+  `categoria` varchar(50) NOT NULL,
+  `link_youtube` varchar(255) NOT NULL,
+  `duracao` int(11) DEFAULT NULL COMMENT 'Duração em segundos',
+  `status` enum('pendente','avaliado','correcao','aprovado','reprovado') DEFAULT 'pendente',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Despejando dados para a tabela `videos`
+--
+
+INSERT INTO `videos` (`id`, `titulo`, `tema`, `descricao`, `categoria`, `link_youtube`, `duracao`, `status`, `created_at`) VALUES
+(1, 'Poupar', 'Educação Financeira', 'O objetivo foi produzir uma paródia da música \"Ouvir Dizer\" de Melim, adequando-a à temática da educação financeira.', 'Comunidade em Geral', 'https://www.youtube.com/watch?v=n_6xkXw6fu8', NULL, 'pendente', '2025-05-18 18:03:32'),
+(2, 'Números Primos', 'O vídeo explica o que vem a ser número primo', 'O vídeo explica o que vem a ser número primo, esclarecendo dúvidas comuns sobre essa temática, tais como, o número 1 é primo?, o número 0 é primo?, os números negativos são primos?, existe uma fórmula para determinar números primos?', 'Comunidade em geral', 'https://www.youtube.com/watch?v=jMCwNqmVQBY', NULL, 'avaliado', '2025-05-18 19:47:23'),
+(3, 'Infinito', 'Conceito de infinito', 'Trata das características únicas do conceito de infinito dentro da matemática', 'Comunidade em geral ', 'https://www.youtube.com/watch?v=DyULqbKWgF0', NULL, 'pendente', '2025-05-18 21:44:14'),
+(4, 'Como provar algo em matemática?', 'O vídeo irá abordar como a matemática está fundamentada em provas.', 'O vídeo irá abordar como a matemática está fundamentada em provas. Após essa breve introdução, nós comentaremos sobre os meios mais comuns de provar algo, trazendo exemplos. Vamos falar das provas por indução, um método direto, prova por absurdo e uma situação em que podemos usar o contraexemplo.', 'Graduandos em Matemática', 'https://www.youtube.com/watch?v=jFFlbZhiGak', NULL, 'pendente', '2025-05-18 21:48:17');
+
+--
+-- Índices para tabelas despejadas
+--
+
+--
+-- Índices de tabela `avaliacoes`
+--
+ALTER TABLE `avaliacoes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `id_user` (`id_user`),
+  ADD KEY `id_video` (`id_video`);
+
+--
+-- Índices de tabela `options`
+--
+ALTER TABLE `options`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `option_name` (`option_name`);
+
+--
+-- Índices de tabela `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `email` (`email`);
+
+--
+-- Índices de tabela `videos`
+--
+ALTER TABLE `videos`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- AUTO_INCREMENT para tabelas despejadas
+--
+
+--
+-- AUTO_INCREMENT de tabela `avaliacoes`
+--
+ALTER TABLE `avaliacoes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT de tabela `options`
+--
+ALTER TABLE `options`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT de tabela `users`
+--
+ALTER TABLE `users`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT de tabela `videos`
+--
+ALTER TABLE `videos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- Restrições para tabelas despejadas
+--
+
+--
+-- Restrições para tabelas `avaliacoes`
+--
+ALTER TABLE `avaliacoes`
+  ADD CONSTRAINT `avaliacoes_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `avaliacoes_ibfk_2` FOREIGN KEY (`id_video`) REFERENCES `videos` (`id`);
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
