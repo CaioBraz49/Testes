@@ -6,6 +6,13 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_tipo'] !== 'admin') {
     exit();
 }
 require_once '../includes/config.php'; //
+require_once '../includes/auth.php';
+
+// --- ESTA PARTE VOCÊ JÁ TINHA, MANTENDO ---
+if (!isset($_SESSION['show_evaluators'])) {
+    $_SESSION['show_evaluators'] = true; // Default: mostrar avaliadores
+}
+// --- FIM DA PARTE EXISTENTE ---
 
 $categories_config = [ //
     'anos_finais_ef' => 'Anos Finais do Ensino Fundamental',
@@ -17,7 +24,8 @@ $categories_config = [ //
 ];
 
 // --- PROCESSAMENTO DO FORMULÁRIO DE ATUALIZAÇÃO DE AVALIADOR (CATEGORIAS E LIMITES POR CATEGORIA) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_evaluator_settings'])) { //
+// ... (seu código existente para processar o formulário update_evaluator_settings - MANTIDO COMO ESTÁ) ...
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_evaluator_settings'])) { 
     $user_id_to_update = filter_input(INPUT_POST, 'user_id', FILTER_VALIDATE_INT);
 
     if ($user_id_to_update) {
@@ -27,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_evaluator_sett
         $final_assigned_cat_keys_for_db = [];
         $pdo->beginTransaction();
         try {
-            $stmt_delete_quotas = $pdo->prepare("DELETE FROM evaluator_category_quotas WHERE user_id = :user_id"); //
+            $stmt_delete_quotas = $pdo->prepare("DELETE FROM evaluator_category_quotas WHERE user_id = :user_id"); 
             $stmt_delete_quotas->execute([':user_id' => $user_id_to_update]);
 
             foreach ($categories_config as $cat_key => $cat_display_name) {
@@ -38,11 +46,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_evaluator_sett
                         if ($limit_str !== '') { 
                             $limit_val = filter_var($limit_str, FILTER_VALIDATE_INT);
                             if ($limit_val !== false && $limit_val >= 0) {
-                                $stmt_insert_quota = $pdo->prepare("INSERT INTO evaluator_category_quotas (user_id, category_key, quota) VALUES (:uid, :ckey, :q)"); //
+                                $stmt_insert_quota = $pdo->prepare("INSERT INTO evaluator_category_quotas (user_id, category_key, quota) VALUES (:uid, :ckey, :q)"); 
                                 $stmt_insert_quota->execute([':uid' => $user_id_to_update, ':ckey' => $cat_key, ':q' => $limit_val]);
                             } else {
                                 if (!isset($_SESSION['warning_partial'])) $_SESSION['warning_partial'] = "";
-                                $_SESSION['warning_partial'] .= "Limite inválido para categoria '{$cat_display_name}' do avaliador ID {$user_id_to_update} não foi salvo. "; //
+                                $_SESSION['warning_partial'] .= "Limite inválido para categoria '{$cat_display_name}' do avaliador ID {$user_id_to_update} não foi salvo. "; 
                             }
                         }
                     }
@@ -50,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_evaluator_sett
             }
 
             $categorias_db_string = implode(',', $final_assigned_cat_keys_for_db);
-            $stmt_update_user = $pdo->prepare("UPDATE users SET categoria = :categoria WHERE id = :id"); //
+            $stmt_update_user = $pdo->prepare("UPDATE users SET categoria = :categoria WHERE id = :id"); 
             $stmt_update_user->execute([':categoria' => $categorias_db_string, ':id' => $user_id_to_update]);
             
             $pdo->commit();
@@ -76,16 +84,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_evaluator_sett
 }
 
 // --- Lógica para atualizar STATUS DO VÍDEO ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_update_video_status'])) { //
+// ... (seu código existente para processar submit_update_video_status - MANTIDO COMO ESTÁ) ...
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_update_video_status'])) { 
     $video_id_to_update = filter_input(INPUT_POST, 'video_id_to_update_status', FILTER_VALIDATE_INT);
     $new_status = $_POST['new_video_status'] ?? ''; 
     
-    // Updated based on new table structure for videos.status ENUM
     $allowed_statuses = ['pendente','correcao','aprovado','reprovado','aprovado_classificado']; 
 
     if ($video_id_to_update && in_array($new_status, $allowed_statuses)) {
         try {
-            $stmt_update_video = $pdo->prepare("UPDATE videos SET status = :new_status WHERE id = :video_id"); //
+            $stmt_update_video = $pdo->prepare("UPDATE videos SET status = :new_status WHERE id = :video_id"); 
             $stmt_update_video->execute([':new_status' => $new_status, ':video_id' => $video_id_to_update]);
             $_SESSION['success'] = "Status do vídeo ID " . htmlspecialchars($video_id_to_update) . " atualizado para '" . htmlspecialchars($new_status) . "' com sucesso!";
         } catch (PDOException $e) {
@@ -110,18 +118,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_update_video_s
 }
 
 // --- Consultas para estatísticas ---
-$qtd_videos = $pdo->query("SELECT COUNT(*) FROM videos")->fetchColumn(); //
-$qtd_avaliadores = $pdo->query("SELECT COUNT(*) FROM users WHERE tipo = 'avaliador'")->fetchColumn(); //
-$qtd_avaliacoes = $pdo->query("SELECT COUNT(*) FROM avaliacoes")->fetchColumn(); //
+// ... (seu código existente para $qtd_videos, $qtd_avaliadores, $qtd_avaliacoes - MANTIDO COMO ESTÁ) ...
+$qtd_videos = $pdo->query("SELECT COUNT(*) FROM videos")->fetchColumn(); 
+$qtd_avaliadores = $pdo->query("SELECT COUNT(*) FROM users WHERE tipo = 'avaliador'")->fetchColumn(); 
+$qtd_avaliacoes = $pdo->query("SELECT COUNT(*) FROM avaliacoes")->fetchColumn(); 
 
 // --- Filtro de categorias para vídeos ---
+// ... (seu código existente para $categoria_filtro, $sql_videos, $videos - MANTIDO COMO ESTÁ) ...
 $categoria_filtro = $_GET['categoria'] ?? 'todas';
-
-// **ASSUMPTION**: Added `v.nome AS autor_nome, v.email AS autor_email` to fetch author details for contact modal.
-// These columns `nome` and `email` are from the NEW video table structure the user provided.
 $sql_videos = "SELECT v.id, v.titulo, v.tema, v.categoria, v.link_youtube, v.status, v.created_at, v.nome AS autor_nome, v.email AS autor_email FROM videos v"; 
 if ($categoria_filtro !== 'todas') {
-    $sql_videos .= " WHERE v.categoria = :categoria"; //
+    $sql_videos .= " WHERE v.categoria = :categoria"; 
 }
 $sql_videos .= " ORDER BY v.created_at DESC";
 
@@ -130,48 +137,45 @@ if ($categoria_filtro !== 'todas') {
     $stmt_videos->bindParam(':categoria', $categoria_filtro);
 }
 $stmt_videos->execute();
-$videos = $stmt_videos->fetchAll(PDO::FETCH_ASSOC); //
+$videos = $stmt_videos->fetchAll(PDO::FETCH_ASSOC); 
 
 // --- Consulta de avaliadores ---
-$avaliadores = $pdo->query("SELECT id, nome, email, categoria FROM users WHERE tipo = 'avaliador' ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC); //
+// ... (seu código existente para $avaliadores, categoriaAtiva, $avaliacoes_por_categoria, $all_evaluator_quotas - MANTIDO COMO ESTÁ) ...
+$avaliadores = $pdo->query("SELECT id, nome, email, categoria FROM users WHERE tipo = 'avaliador' ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC); 
 
-function categoriaAtiva($categoria_str, $categoria_busca_key) { //
+function categoriaAtiva($categoria_str, $categoria_busca_key) { 
     return in_array($categoria_busca_key, explode(',', $categoria_str ?? ''));
 }
 
 $avaliacoes_por_categoria = [];
-$stmt_apc = $pdo->query("SELECT a.id_user, v.categoria, COUNT(*) as total FROM avaliacoes a JOIN videos v ON a.id_video = v.id GROUP BY a.id_user, v.categoria"); //
+$stmt_apc = $pdo->query("SELECT a.id_user, v.categoria, COUNT(*) as total FROM avaliacoes a JOIN videos v ON a.id_video = v.id GROUP BY a.id_user, v.categoria"); 
 while ($row_apc = $stmt_apc->fetch(PDO::FETCH_ASSOC)) {
     $avaliacoes_por_categoria[$row_apc['id_user']][$row_apc['categoria']] = $row_apc['total'];
 }
 
 $all_evaluator_quotas = [];
-$stmt_fetch_all_quotas = $pdo->query("SELECT user_id, category_key, quota FROM evaluator_category_quotas"); //
+$stmt_fetch_all_quotas = $pdo->query("SELECT user_id, category_key, quota FROM evaluator_category_quotas"); 
 while ($quota_row = $stmt_fetch_all_quotas->fetch(PDO::FETCH_ASSOC)) {
     $all_evaluator_quotas[$quota_row['user_id']][$quota_row['category_key']] = $quota_row['quota'];
 }
 
-// Status options for the "Mudar Status" dropdown, reflecting new enum
+// ... (seu código existente para $video_statuses_options_dropdown, $video_statuses_display_texts - MANTIDO COMO ESTÁ) ...
 $video_statuses_options_dropdown = [
     'pendente' => 'Pendente', 
     'correcao' => 'Correção Solicitada',
     'aprovado' => 'Aprovado', 
     'reprovado' => 'Reprovado', 
     'aprovado_classificado' => 'Aprovado e Classificado'
-    // 'avaliado' and 'reavaliar' are not in the new videos.status enum from user's DDL
 ];
-
-// For display purposes, we might want more descriptive texts for statuses, including old ones for context if needed
 $video_statuses_display_texts = [
     'pendente' => 'Pendente', 
-    'avaliado' => 'Avaliado (1ª Rodada)', // Kept for display if some logic still uses it
+    'avaliado' => 'Avaliado (1ª Rodada)', 
     'correcao' => 'Correção Solicitada',
     'aprovado' => 'Aprovado', 
     'reprovado' => 'Reprovado', 
-    'reavaliar' => 'Reavaliar (3º Parecer)', // Kept for display
+    'reavaliar' => 'Reavaliar (3º Parecer)', 
     'aprovado_classificado' => 'Aprovado e Classificado'
 ];
-
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -208,6 +212,16 @@ $video_statuses_display_texts = [
 
         .modal-draggable .modal-header { cursor: move; background-color: #f8f9fa; }
         .modal-dialog-centered { display: flex; align-items: center; min-height: calc(100% - 1rem); }
+
+        /* Estilo para o switch, pode ajustar conforme necessário */
+        #evaluatorsToggleContainer .form-check-input { 
+            width: 3.5em; 
+            height: 1.75em;
+            margin-top: 0.1em; /* Ajuste vertical se necessário */
+        }
+        #evaluatorsToggleContainer .form-check-label {
+             padding-left: 0.5em; /* Espaço entre o switch e o label */
+        }
     </style>
 </head>
 <body>
@@ -265,64 +279,69 @@ $video_statuses_display_texts = [
         </div>
         
         <div class="card mb-4">
-            <div class="card-header card-header-custom-light-purple text-white">
+            <div class="card-header card-header-custom-light-purple text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Lista de Avaliadores e Limites por Categoria</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th rowspan="2" style="vertical-align: middle;">Avaliador</th>
-                                <?php foreach ($categories_config as $cat_display_name): ?>
-                                    <th class="text-center" style="min-width: 150px;"><?= htmlspecialchars($cat_display_name) ?></th>
-                                <?php endforeach; ?>
-                                <th rowspan="2" style="vertical-align: middle;">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($avaliadores as $avaliador): ?>
-                                <tr>
-                                    <form method="post" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'] . (isset($_GET['categoria']) ? '?categoria=' . urlencode($_GET['categoria']) : '')); ?>">
-                                        <input type="hidden" name="user_id" value="<?= $avaliador['id'] ?>">
-                                        <td class="text-nowrap">
-                                            <?= htmlspecialchars($avaliador['nome']) ?><br>
-                                            <small class="text-muted"><?= htmlspecialchars($avaliador['email']) ?></small>
-                                        </td>
-                                        <?php
-                                        $id_avaliador_loop = $avaliador['id'];
-                                        $user_categorias_str_loop = $avaliador['categoria']; 
-                                        ?>
-                                        <?php foreach ($categories_config as $cat_key => $cat_display_name): ?>
-                                            <td class="text-center">
-                                                <div class="form-check d-inline-block me-2 align-middle">
-                                                    <input class="form-check-input" type="checkbox" 
-                                                           name="assigned_categories[<?= $cat_key ?>]" 
-                                                           id="<?= $cat_key ?>_assigned_<?= $id_avaliador_loop ?>" 
-                                                           value="1" <?= categoriaAtiva($user_categorias_str_loop, $cat_key) ? 'checked' : '' ?>
-                                                           title="Atribuir categoria <?= htmlspecialchars($cat_display_name) ?>">
-                                                    <label class="form-check-label visually-hidden" for="<?= $cat_key ?>_assigned_<?= $id_avaliador_loop ?>">Atribuir</label>
-                                                </div>
-                                                <input type="number" class="form-control form-control-sm limit-input d-inline-block align-middle"
-                                                       name="category_limits[<?= $cat_key ?>]"
-                                                       id="limit_<?= $cat_key ?>_<?= $id_avaliador_loop ?>"
-                                                       value="<?= htmlspecialchars($all_evaluator_quotas[$id_avaliador_loop][$cat_key] ?? '') ?>"
-                                                       placeholder="N/A" min="0" title="Limite para <?= htmlspecialchars($cat_display_name) ?>. Vazio para ilimitado.">
-                                                <div class="small text-muted mt-1">
-                                                    (<?= $avaliacoes_por_categoria[$id_avaliador_loop][$cat_display_name] ?? 0 ?>)
-                                                </div>
-                                            </td>
-                                        <?php endforeach; ?>
-                                        <td class="text-nowrap align-middle">
-                                            <button type="submit" name="update_evaluator_settings" class="btn btn-primary btn-sm">Salvar</button>
-                                        </td>
-                                    </form>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                <div class="form-check form-switch" id="evaluatorsToggleContainer">
+                    <input class="form-check-input" type="checkbox" role="switch" id="toggleEvaluators" <?php echo $_SESSION['show_evaluators'] ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="toggleEvaluators">Exibir</label>
                 </div>
-            </div>
+                </div>
+            <div class="card-body">
+                <div id="evaluatorsTableWrapper" class="<?php echo $_SESSION['show_evaluators'] ? '' : 'd-none'; ?>">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th rowspan="2" style="vertical-align: middle;">Avaliador</th>
+                                    <?php foreach ($categories_config as $cat_display_name): ?>
+                                        <th class="text-center" style="min-width: 150px;"><?= htmlspecialchars($cat_display_name) ?></th>
+                                    <?php endforeach; ?>
+                                    <th rowspan="2" style="vertical-align: middle;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($avaliadores as $avaliador): ?>
+                                    <tr>
+                                        <form method="post" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF'] . (isset($_GET['categoria']) ? '?categoria=' . urlencode($_GET['categoria']) : '')); ?>">
+                                            <input type="hidden" name="user_id" value="<?= $avaliador['id'] ?>">
+                                            <td class="text-nowrap">
+                                                <?= htmlspecialchars($avaliador['nome']) ?><br>
+                                                <small class="text-muted"><?= htmlspecialchars($avaliador['email']) ?></small>
+                                            </td>
+                                            <?php
+                                            $id_avaliador_loop = $avaliador['id'];
+                                            $user_categorias_str_loop = $avaliador['categoria']; 
+                                            ?>
+                                            <?php foreach ($categories_config as $cat_key => $cat_display_name): ?>
+                                                <td class="text-center">
+                                                    <div class="form-check d-inline-block me-2 align-middle">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               name="assigned_categories[<?= $cat_key ?>]" 
+                                                               id="<?= $cat_key ?>_assigned_<?= $id_avaliador_loop ?>" 
+                                                               value="1" <?= categoriaAtiva($user_categorias_str_loop, $cat_key) ? 'checked' : '' ?>
+                                                               title="Atribuir categoria <?= htmlspecialchars($cat_display_name) ?>">
+                                                        <label class="form-check-label visually-hidden" for="<?= $cat_key ?>_assigned_<?= $id_avaliador_loop ?>">Atribuir</label>
+                                                    </div>
+                                                    <input type="number" class="form-control form-control-sm limit-input d-inline-block align-middle"
+                                                           name="category_limits[<?= $cat_key ?>]"
+                                                           id="limit_<?= $cat_key ?>_<?= $id_avaliador_loop ?>"
+                                                           value="<?= htmlspecialchars($all_evaluator_quotas[$id_avaliador_loop][$cat_key] ?? '') ?>"
+                                                           placeholder="N/A" min="0" title="Limite para <?= htmlspecialchars($cat_display_name) ?>. Vazio para ilimitado.">
+                                                    <div class="small text-muted mt-1">
+                                                        (<?= $avaliacoes_por_categoria[$id_avaliador_loop][$cat_display_name] ?? 0 ?>)
+                                                    </div>
+                                                </td>
+                                            <?php endforeach; ?>
+                                            <td class="text-nowrap align-middle">
+                                                <button type="submit" name="update_evaluator_settings" class="btn btn-primary btn-sm">Salvar</button>
+                                            </td>
+                                        </form>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div> </div>
         </div>
 
         <div class="card mb-4">
@@ -371,6 +390,7 @@ $video_statuses_display_texts = [
                             <?php else: ?>
                                 <?php foreach ($videos as $video_item): ?>
                                     <?php
+                                    // ... (seu código PHP para badges de status e avaliações - MANTIDO COMO ESTÁ) ...
                                     $stmt_evals = $pdo->prepare("SELECT a.parecer, u.nome, u.id as id_user FROM avaliacoes a JOIN users u ON a.id_user = u.id WHERE a.id_video = :vid ORDER BY a.data_avaliacao DESC");
                                     $stmt_evals->execute([':vid' => $video_item['id']]);
                                     $evaluations_for_this_video = $stmt_evals->fetchAll(PDO::FETCH_ASSOC);
@@ -399,10 +419,9 @@ $video_statuses_display_texts = [
                                             if($is_truly_finalist) $badge_class = 'primary';
                                         }
                                     }
-                                    if ($video_item['status'] === 'aprovado_classificado') { // Ensure it's primary if status is directly 'aprovado_classificado'
+                                    if ($video_item['status'] === 'aprovado_classificado') { 
                                         $badge_class = 'primary';
                                     }
-
                                     ?>
                                     <tr class="video-row">
                                         <td><span class="badge badge-<?= htmlspecialchars($badge_class) ?>"><?= htmlspecialchars($status_text) ?></span></td>
@@ -550,200 +569,159 @@ $video_statuses_display_texts = [
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // --- NOVO JAVASCRIPT PARA O TOGGLE DE AVALIADORES ---
+        const toggleEvaluatorsSwitch = document.getElementById('toggleEvaluators');
+        const evaluatorsTableWrapper = document.getElementById('evaluatorsTableWrapper'); // Alvo agora é o wrapper da tabela
+
+        if (toggleEvaluatorsSwitch && evaluatorsTableWrapper) {
+            toggleEvaluatorsSwitch.addEventListener('change', function() {
+                const isChecked = this.checked;
+                if (isChecked) {
+                    evaluatorsTableWrapper.classList.remove('d-none');
+                } else {
+                    evaluatorsTableWrapper.classList.add('d-none');
+                }
+
+                // Atualizar a sessão via AJAX
+                fetch('actions/update_evaluator_visibility.php', { // Caminho para o handler PHP
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'show_evaluators=' + (isChecked ? '1' : '0')
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        console.error('Erro ao atualizar a preferência de visualização.');
+                        // Opcional: reverter UI ou mostrar erro para o usuário
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro na requisição AJAX:', error);
+                });
+            });
+        }
+        // --- FIM DO NOVO JAVASCRIPT PARA O TOGGLE ---
+
+        // Seu JavaScript existente para '.ver-detalhes', modais de contato, TinyMCE, etc.
+        // (MANTIDO COMO ESTÁ)
         document.querySelectorAll('.ver-detalhes').forEach(button => {
-    button.addEventListener('click', function(e) {
-        e.preventDefault();
-        console.log("'.ver-detalhes' clicado."); // 1. O clique foi detectado?
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const videoId = this.dataset.videoId;
+                const avaliadorId = this.dataset.avaliadorId;
+                const avaliadorNome = this.dataset.avaliadorNome;
+                const avaliacaoModalElement = document.getElementById('avaliacaoModal');
+                const avaliacaoModal = bootstrap.Modal.getInstance(avaliacaoModalElement) || new bootstrap.Modal(avaliacaoModalElement);
+                const modalBody = document.getElementById('modalAvaliacaoBody');
+                const modalLabel = document.getElementById('avaliacaoModalLabel');
 
-        const videoId = this.dataset.videoId;
-        const avaliadorId = this.dataset.avaliadorId;
-        const avaliadorNome = this.dataset.avaliadorNome;
-        console.log("Dados extraídos:", { videoId, avaliadorId, avaliadorNome }); // 2. Os dados foram extraídos corretamente?
-
-        const avaliacaoModalElement = document.getElementById('avaliacaoModal');
-        if (!avaliacaoModalElement) {
-            console.error("Elemento do Modal #avaliacaoModal NÃO ENCONTRADO!");
-            return;
-        }
-        // Tente obter a instância do modal aqui, ou reutilize se já instanciado globalmente
-        const avaliacaoModal = bootstrap.Modal.getInstance(avaliacaoModalElement) || new bootstrap.Modal(avaliacaoModalElement);
-
-        const modalBody = document.getElementById('modalAvaliacaoBody');
-        if (!modalBody) {
-            console.error("Corpo do Modal #modalAvaliacaoBody NÃO ENCONTRADO!");
-            return;
-        }
-
-        const modalLabel = document.getElementById('avaliacaoModalLabel');
-        if (modalLabel) {
-            modalLabel.textContent = 'Detalhes da Avaliação - ' + avaliadorNome;
-        } else {
-            console.warn("Label do Modal #avaliacaoModalLabel não encontrado.");
-        }
-        
-        modalBody.innerHTML = `
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Carregando...</span>
-                </div>
-                <p class="mt-2">Carregando detalhes da avaliação...</p>
-            </div>
-        `;
-        
-        console.log("Mostrando o modal #avaliacaoModal..."); // 3. Estamos tentando mostrar o modal?
-        avaliacaoModal.show();
-        
-        console.log("Fazendo fetch para get_avaliacao_details.php..."); // 4. A chamada AJAX está sendo iniciada?
-        fetch('get_avaliacao_details.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `video_id=${videoId}&avaliador_id=${avaliadorId}`
-        })
-        .then(response => {
-            console.log("Resposta do fetch recebida. Status:", response.status); // 5. Qual o status da resposta?
-            if (!response.ok) {
-                throw new Error(`Erro HTTP! Status: ${response.status}`);
-            }
-            return response.text();
-        })
-        .then(data => {
-            console.log("Dados recebidos do fetch (primeiros 200 chars):", data.substring(0, 200)); // 6. Quais dados foram recebidos?
-            modalBody.innerHTML = data;
-        })
-        .catch(error => {
-            console.error('Erro durante o fetch ou processamento dos dados:', error); // 7. Ocorreu algum erro no fetch?
-            modalBody.innerHTML = `
-                <div class="alert alert-danger">
-                    Erro ao carregar os detalhes da avaliação.<br>
-                    ${error.message}
-                </div>
-            `;
+                if (modalLabel) {
+                    modalLabel.textContent = 'Detalhes da Avaliação - ' + avaliadorNome;
+                }
+                modalBody.innerHTML = `<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div><p class="mt-2">Carregando detalhes...</p></div>`;
+                avaliacaoModal.show();
+                
+                fetch('get_avaliacao_details.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: `video_id=${videoId}&avaliador_id=${avaliadorId}`
+                })
+                .then(response => response.ok ? response.text() : Promise.reject(`Erro HTTP! Status: ${response.status}`))
+                .then(data => { modalBody.innerHTML = data; })
+                .catch(error => {
+                    console.error('Erro AJAX:', error);
+                    modalBody.innerHTML = `<div class="alert alert-danger">Erro ao carregar os detalhes. ${error}</div>`;
+                });
+            });
         });
-    });
-});
 
         const contactModalEl = document.getElementById('contactModal');
-    const infoModalEl = document.getElementById('infoModal');
-    // Assegure-se que os modais são instanciados corretamente com new bootstrap.Modal()
-    const contactModalJsInstance = contactModalEl ? new bootstrap.Modal(contactModalEl) : null;
-    const infoModalJsInstance = infoModalEl ? new bootstrap.Modal(infoModalEl) : null;
-    
-    let currentContactData = {}; // Para armazenar os dados do contato atual
-    let contactFormState = {}; // Para armazenar o estado do formulário ao trocar para o infoModal
+        const infoModalEl = document.getElementById('infoModal');
+        const contactModalJsInstance = contactModalEl ? new bootstrap.Modal(contactModalEl) : null;
+        const infoModalJsInstance = infoModalEl ? new bootstrap.Modal(infoModalEl) : null;
+        
+        let currentContactData = {}; 
+        let contactFormState = {}; 
 
-    if(contactModalEl && contactModalJsInstance) {
-        contactModalEl.addEventListener('shown.bs.modal', function(event) {
-            const button = event.relatedTarget; // Botão que acionou o modal
-            if (!button) return; // Sai se o modal não foi acionado por um botão
+        if(contactModalEl && contactModalJsInstance) {
+            contactModalEl.addEventListener('shown.bs.modal', function(event) {
+                const button = event.relatedTarget; 
+                if (!button) return; 
 
-            // Coleta os dados do vídeo/autor dos atributos data-* do botão
-            currentContactData = { 
-                email: button.getAttribute('data-email') || '', // Email do autor do vídeo
-                nome: button.getAttribute('data-nome') || 'Participante', // Nome do autor do vídeo
-                video: button.getAttribute('data-video') || 'Não especificado', // Título do vídeo
-                categoria: button.getAttribute('data-categoria') || 'Não especificada' // Categoria do vídeo
-            };
-            
-            // Preenche os campos visíveis e ocultos do formulário do modal
-            document.getElementById('modalDestinatarioVisivel').value = `${currentContactData.nome} <${currentContactData.email}>`;
-            document.getElementById('contactEmailHidden').value = currentContactData.email;
-            document.getElementById('contactNomeHidden').value = currentContactData.nome;
-            document.getElementById('contactAssunto').value = `FESTIVAL - Correção de vídeo: ${currentContactData.video}`;
-            
-            // Define a mensagem padrão com os dados coletados
-            const mensagemPadrao = 
-                `<p>Prezado(a) ${currentContactData.nome},</p>` +
-                `<p>Agradecemos sua participação no <strong>Festival de Vídeos Digitais e Educação Matemática</strong>.</p>` +
-                `<p>Gostaríamos de solicitar, gentilmente, que realize correções no vídeo intitulado <em>"${currentContactData.video}"</em> (categoria: ${currentContactData.categoria}) até o dia <strong>[INSIRA A DATA LIMITE AQUI]</strong>.</p>` +
-                `<p>Desde já, agradecemos sua atenção e colaboração.</p>` +
-                `<p>Atenciosamente,</p>` +
-                `<p><strong>Equipe do Festival de Vídeos Digitais e Educação Matemática</strong></p>`;
-            
-            // Tenta preencher o editor TinyMCE
-            const editor = tinymce.get('contactMensagem');
-            if (editor) {
-                editor.setContent(mensagemPadrao);
-            } else {
-                // Fallback se o TinyMCE não estiver pronto ou não encontrado (improvável se inicializado corretamente)
-                // Para um textarea simples, removemos as tags HTML para melhor visualização
-                const plainTextMessage = mensagemPadrao
-                    .replace(/<p>/gi, "")
-                    .replace(/<\/p>/gi, "\n")
-                    .replace(/<strong>/gi, "")
-                    .replace(/<\/strong>/gi, "")
-                    .replace(/<em>/gi, "")
-                    .replace(/<\/em>/gi, "")
-                    .replace(/<br\s*\/?>/gi, "\n")
-                    .trim();
-                document.getElementById('contactMensagem').value = plainTextMessage;
-                console.warn("TinyMCE editor 'contactMensagem' não encontrado. Preenchendo textarea diretamente.");
-            }
-        });
-    }
+                currentContactData = { 
+                    email: button.getAttribute('data-email') || '', 
+                    nome: button.getAttribute('data-nome') || 'Participante', 
+                    video: button.getAttribute('data-video') || 'Não especificado', 
+                    categoria: button.getAttribute('data-categoria') || 'Não especificada' 
+                };
+                
+                document.getElementById('modalDestinatarioVisivel').value = `${currentContactData.nome} <${currentContactData.email}>`;
+                document.getElementById('contactEmailHidden').value = currentContactData.email;
+                document.getElementById('contactNomeHidden').value = currentContactData.nome;
+                document.getElementById('contactAssunto').value = `FESTIVAL - Correção de vídeo: ${currentContactData.video}`;
+                
+                const mensagemPadrao = 
+                    `<p>Prezado(a) ${currentContactData.nome},</p>` +
+                    `<p>Agradecemos sua participação no <strong>Festival de Vídeos Digitais e Educação Matemática</strong>.</p>` +
+                    `<p>Gostaríamos de solicitar, gentilmente, que realize correções no vídeo intitulado <em>"${currentContactData.video}"</em> (categoria: ${currentContactData.categoria}) até o dia <strong>[INSIRA A DATA LIMITE AQUI]</strong>.</p>` +
+                    `<p>Desde já, agradecemos sua atenção e colaboração.</p>` +
+                    `<p>Atenciosamente,</p>` +
+                    `<p><strong>Equipe do Festival de Vídeos Digitais e Educação Matemática</strong></p>`;
+                
+                const editor = tinymce.get('contactMensagem');
+                if (editor) {
+                    editor.setContent(mensagemPadrao);
+                } else {
+                    const plainTextMessage = mensagemPadrao.replace(/<[^>]+>/g, '\n').replace(/\n\n+/g, '\n').trim();
+                    document.getElementById('contactMensagem').value = plainTextMessage;
+                }
+            });
+        }
 
-    const infoButtonTrigger = document.getElementById('infoButtonTrigger');
-    if(infoButtonTrigger && contactModalJsInstance && infoModalJsInstance) {
-        infoButtonTrigger.addEventListener('click', function() {
-            // Salva o estado atual do formulário de contato antes de mudar de modal
-            contactFormState = {
-                assunto: document.getElementById('contactAssunto').value,
-                mensagem: tinymce.get('contactMensagem') ? tinymce.get('contactMensagem').getContent() : document.getElementById('contactMensagem').value
-            };
+        const infoButtonTrigger = document.getElementById('infoButtonTrigger');
+        if(infoButtonTrigger && contactModalJsInstance && infoModalJsInstance) {
+            infoButtonTrigger.addEventListener('click', function() {
+                contactFormState = {
+                    assunto: document.getElementById('contactAssunto').value,
+                    mensagem: tinymce.get('contactMensagem') ? tinymce.get('contactMensagem').getContent() : document.getElementById('contactMensagem').value
+                };
+                const infoContentHTML = 
+                    `<h6>Detalhes do Contato</h6><p><strong>Nome:</strong> ${currentContactData.nome||'N/A'}</p><p><strong>Email:</strong> ${currentContactData.email||'N/A'}</p><hr>` +
+                    `<h6>Detalhes do Vídeo</h6><p><strong>Título:</strong> ${currentContactData.video||'N/A'}</p><p><strong>Categoria:</strong> ${currentContactData.categoria||'N/A'}</p>`;
+                document.getElementById('contactInfoModalBody').innerHTML = infoContentHTML;
+                contactModalJsInstance.hide();
+                infoModalJsInstance.show();
+            });
+        }
 
-            const infoContentHTML = 
-                `<h6>Detalhes do Contato</h6>` +
-                `<p><strong>Nome:</strong> ${currentContactData.nome || 'N/A'}</p>` +
-                `<p><strong>Email:</strong> ${currentContactData.email || 'N/A'}</p><hr>` +
-                `<h6>Detalhes do Vídeo</h6>` +
-                `<p><strong>Título:</strong> ${currentContactData.video || 'N/A'}</p>` +
-                `<p><strong>Categoria:</strong> ${currentContactData.categoria || 'N/A'}</p>`;
-            document.getElementById('contactInfoModalBody').innerHTML = infoContentHTML;
-            
-            contactModalJsInstance.hide();
-            infoModalJsInstance.show();
-        });
-    }
-
-    const backToContactBtn = document.getElementById('backToContactModalButtonTrigger');
-    if(backToContactBtn && contactModalJsInstance && infoModalJsInstance) {
-        backToContactBtn.addEventListener('click', function() {
-            infoModalJsInstance.hide();
-            contactModalJsInstance.show();
-            
-            // Restaura o estado do formulário de contato
-            document.getElementById('contactAssunto').value = contactFormState.assunto || `FESTIVAL - Correção de vídeo: ${currentContactData.video || ''}`;
-            const editor = tinymce.get('contactMensagem');
-            if (editor) {
-                editor.setContent(contactFormState.mensagem || '');
-            } else {
-                document.getElementById('contactMensagem').value = contactFormState.mensagem || '';
-            }
-        });
-    }
-    
-    // Inicialização do TinyMCE (deve estar aqui ou em um local que execute após o DOM estar pronto)
-    if (typeof tinymce !== 'undefined') {
-        tinymce.init({
-            selector: 'textarea#contactMensagem', // ID da sua textarea no modal de contato
-            height: 280,
-            language: 'pt_BR',
-            menubar: false,
-            plugins: 'link lists autoresize visualblocks code',
-            toolbar: 'undo redo | styles | bold italic underline | bullist numlist | alignleft aligncenter alignright alignjustify | link | code visualblocks',
-            branding: false,
-            autoresize_bottom_margin: 20,
-            content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
-            setup: function (editor) {
-                editor.on('init', function (e) {
-                    // Se o modal já estiver aberto e o editor inicializar depois,
-                    // você pode tentar preencher aqui, mas é mais confiável no 'show.bs.modal'.
-                });
-            }
-        });
-    }
-});
+        const backToContactBtn = document.getElementById('backToContactModalButtonTrigger');
+        if(backToContactBtn && contactModalJsInstance && infoModalJsInstance) {
+            backToContactBtn.addEventListener('click', function() {
+                infoModalJsInstance.hide();
+                contactModalJsInstance.show();
+                document.getElementById('contactAssunto').value = contactFormState.assunto || `FESTIVAL - Correção de vídeo: ${currentContactData.video || ''}`;
+                const editor = tinymce.get('contactMensagem');
+                if (editor) {
+                    editor.setContent(contactFormState.mensagem || '');
+                } else {
+                    document.getElementById('contactMensagem').value = contactFormState.mensagem || '';
+                }
+            });
+        }
+        
+        if (typeof tinymce !== 'undefined') {
+            tinymce.init({
+                selector: 'textarea#contactMensagem', 
+                height: 280, language: 'pt_BR', menubar: false,
+                plugins: 'link lists autoresize visualblocks code',
+                toolbar: 'undo redo | styles | bold italic underline | bullist numlist | alignleft aligncenter alignright alignjustify | link | code visualblocks',
+                branding: false, autoresize_bottom_margin: 20,
+                content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }'
+            });
+        }
+    });
     </script>
     <?php include '../includes/footer.php'; ?>
 </body>
