@@ -1,0 +1,16 @@
+[01-Jun-2025 23:26:05 UTC] PHP Fatal error:  Uncaught Error: Call to a member function fetchColumn() on bool in /home/sicalis/public_html/festival/admin/index.php:89
+Stack trace:
+#0 {main}
+  thrown in /home/sicalis/public_html/festival/admin/index.php on line 89
+[01-Jun-2025 23:26:10 UTC] PHP Fatal error:  Uncaught Error: Call to a member function fetchColumn() on bool in /home/sicalis/public_html/festival/admin/index.php:89
+Stack trace:
+#0 {main}
+  thrown in /home/sicalis/public_html/festival/admin/index.php on line 89
+[01-Jun-2025 23:26:11 UTC] PHP Fatal error:  Uncaught Error: Call to a member function fetchColumn() on bool in /home/sicalis/public_html/festival/admin/index.php:89
+Stack trace:
+#0 {main}
+  thrown in /home/sicalis/public_html/festival/admin/index.php on line 89
+[01-Jun-2025 23:26:12 UTC] PHP Fatal error:  Uncaught Error: Call to a member function fetchColumn() on bool in /home/sicalis/public_html/festival/admin/index.php:89
+Stack trace:
+#0 {main}
+  thrown in /home/sicalis/public_html/festival/admin/index.php on line 89
