@@ -1,0 +1,217 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: localhost:3306
+-- Tempo de geração: 03/06/2025 às 00:45
+-- Versão do servidor: 5.6.51-log
+-- Versão do PHP: 8.1.16
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+--
+-- Banco de dados: `sicalis_festival`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `avaliacoes`
+--
+
+CREATE TABLE `avaliacoes` (
+  `id` int(11) NOT NULL,
+  `id_user` int(11) NOT NULL,
+  `id_video` int(11) NOT NULL,
+  `conceitos_corretos` tinyint(1) DEFAULT NULL,
+  `comentario_conceitos` text,
+  `tempo_respeitado` tinyint(1) DEFAULT NULL,
+  `comentario_tempo` text,
+  `possui_titulo` tinyint(1) DEFAULT NULL,
+  `comentario_titulo` text,
+  `possui_creditos` tinyint(1) DEFAULT NULL,
+  `comentario_creditos` text,
+  `discurso_adequado` tinyint(1) DEFAULT NULL,
+  `comentario_discurso` text,
+  `audio_qualidade` tinyint(1) DEFAULT NULL,
+  `comentario_audio` text,
+  `imagem_qualidade` tinyint(1) DEFAULT NULL,
+  `comentario_imagem` text,
+  `edicao_correta` tinyint(1) DEFAULT NULL,
+  `comentario_edicao` text,
+  `portugues_correto` tinyint(1) DEFAULT NULL,
+  `comentario_portugues` text,
+  `parecer` enum('aprovado','reprovado','correcao','terceiro','aprovado_classificado') NOT NULL,
+  `justificativa` text,
+  `data_avaliacao` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Despejando dados para a tabela `avaliacoes`
+--
+
+INSERT INTO `avaliacoes` (`id`, `id_user`, `id_video`, `conceitos_corretos`, `comentario_conceitos`, `tempo_respeitado`, `comentario_tempo`, `possui_titulo`, `comentario_titulo`, `possui_creditos`, `comentario_creditos`, `discurso_adequado`, `comentario_discurso`, `audio_qualidade`, `comentario_audio`, `imagem_qualidade`, `comentario_imagem`, `edicao_correta`, `comentario_edicao`, `portugues_correto`, `comentario_portugues`, `parecer`, `justificativa`, `data_avaliacao`) VALUES
+(5, 2, 1, 1, '', 1, '', 1, '', 1, '', 1, '', 0, 'Em alguns momentos o som não é claro', 1, '', 1, '', 1, '', 'aprovado', 'Classificado', '2025-05-19 18:49:18'),
+(6, 2, 2, 1, '', 1, '', 1, '', 1, '', 1, '', 1, '', 0, '', 1, '', 0, '', 'aprovado', 'aprovado', '2025-05-23 20:27:35'),
+(7, 3, 1, 1, '', 0, 'erro ', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 'correcao', 'erro', '2025-05-23 20:32:20'),
+(8, 3, 2, 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 0, '', 'aprovado', 'ok', '2025-05-23 21:31:52');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `options`
+--
+
+CREATE TABLE `options` (
+  `id` int(11) NOT NULL,
+  `option_name` varchar(200) NOT NULL,
+  `option_value` text NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+--
+-- Despejando dados para a tabela `options`
+--
+
+INSERT INTO `options` (`id`, `option_name`, `option_value`) VALUES
+(1, 'limite_videos', '10');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `users`
+--
+
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL,
+  `nome` varchar(100) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `senha` varchar(255) NOT NULL,
+  `categoria` text NOT NULL,
+  `tipo` enum('admin','avaliador') NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Despejando dados para a tabela `users`
+--
+
+INSERT INTO `users` (`id`, `nome`, `email`, `senha`, `categoria`, `tipo`, `created_at`) VALUES
+(1, 'Valci', 'valcibalbino@gmail.com', '123', 'admin', 'admin', '2025-05-18 01:22:24'),
+(2, 'João', 'joao@sicalis.com.br', '123', 'anos_finais_ef,ensino_medio,povos_orig_trad,com_geral', 'avaliador', '2025-05-18 01:22:24'),
+(3, 'Maria', 'maria@sicalis.com.br', '123', 'ensino_medio,povos_orig_trad,com_geral', 'avaliador', '2025-05-18 01:22:24'),
+(4, 'Pamella', 'pamella@sicalis.com.br', '123', 'admin', 'admin', '2025-05-18 01:22:24'),
+(5, 'Ana', 'ana@sicalis.com.br', '123', 'anos_finais_ef,ensino_medio,grad_mat_afins,prof_acao,povos_orig_trad,com_geral', 'avaliador', '2025-05-18 01:22:24');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `videos`
+--
+
+CREATE TABLE `videos` (
+  `id` int(11) NOT NULL,
+  `nome` varchar(255) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `cidade` varchar(100) DEFAULT NULL,
+  `estado` varchar(50) DEFAULT NULL,
+  `telefone` varchar(20) DEFAULT NULL,
+  `instituicao_ensino` varchar(255) DEFAULT NULL,
+  `nivel_instituicao` varchar(50) DEFAULT NULL,
+  `autarquia` varchar(50) DEFAULT NULL,
+  `titulo` varchar(200) NOT NULL,
+  `tema` varchar(100) NOT NULL,
+  `descricao` text,
+  `categoria` enum('Anos Finais do Ensino Fundamental','Ensino Médio','Graduandos em Matemática ou áreas afins','Professores em Ação','Povos Originários e Tradicionais','Comunidade em Geral') DEFAULT NULL,
+  `link_youtube` varchar(255) NOT NULL,
+  `dados` text COMMENT 'JSON com dados dos autores ou vídeo',
+  `status` enum('pendente','correcao','aprovado','reprovado','aprovado_classificado') DEFAULT 'pendente',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Despejando dados para a tabela `videos`
+--
+
+INSERT INTO `videos` (`id`, `nome`, `email`, `cidade`, `estado`, `telefone`, `instituicao_ensino`, `nivel_instituicao`, `autarquia`, `titulo`, `tema`, `descricao`, `categoria`, `link_youtube`, `dados`, `status`, `created_at`) VALUES
+(1, 'Pamella Aleska da Silva Santos', 'pamella.aleska@unesp.br', 'Rio Claro', 'São Paulo (SP)', '(19) 9988 98986', '(Unesp) Universidade Estadual Paulista\n', 'Superior', 'Pública', 'Poupar', 'Educação Financeira', 'O objetivo foi produzir uma paródia da música \"Ouvir Dizer\" de Melim, adequando-a à temática da educação financeira.', 'Anos Finais do Ensino Fundamental', 'https://www.youtube.com/watch?v=n_6xkXw6fu8', NULL, 'pendente', '2025-05-18 18:03:32'),
+(2, 'Pamella Aleska da Silva Santos', 'pamella.aleska@unesp.br', NULL, NULL, NULL, NULL, NULL, NULL, 'Números Primos', 'O vídeo explica o que vem a ser número primo', 'O vídeo explica o que vem a ser número primo, esclarecendo dúvidas comuns sobre essa temática, tais como, o número 1 é primo?, o número 0 é primo?, os números negativos são primos?, existe uma fórmula para determinar números primos?', 'Anos Finais do Ensino Fundamental', 'https://www.youtube.com/watch?v=jMCwNqmVQBY', NULL, 'aprovado_classificado', '2025-05-18 19:47:23'),
+(3, 'Pitágoras de Samos', 'valcibalbino@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, 'Infinito', 'Conceito de infinito', 'Trata das características únicas do conceito de infinito dentro da matemática', 'Ensino Médio', 'https://www.youtube.com/watch?v=DyULqbKWgF0', NULL, 'pendente', '2025-05-18 21:44:14'),
+(4, 'Maria Curie', 'valcibalbino@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, 'Como provar algo em matemática?', 'O vídeo irá abordar como a matemática está fundamentada em provas.', 'O vídeo irá abordar como a matemática está fundamentada em provas. Após essa breve introdução, nós comentaremos sobre os meios mais comuns de provar algo, trazendo exemplos. Vamos falar das provas por indução, um método direto, prova por absurdo e uma situação em que podemos usar o contraexemplo.', 'Graduandos em Matemática ou áreas afins', 'https://www.youtube.com/watch?v=jFFlbZhiGak', NULL, 'pendente', '2025-05-18 21:48:17'),
+(5, 'Maria Curie', 'valcibalbino@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, 'Matapi Balatiponé', '', 'Descrição: O vídeo trata sobre a temática do cesto na cultura Balatiponé', 'Povos Originários e Tradicionais', 'https://www.youtube.com/watch?v=wrJSJuq-Oco', NULL, 'pendente', '2025-05-31 00:27:04'),
+(6, 'Valci Balbino', 'valcibalbino@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, 'Adugo: jogo da onça', '', 'Descrição: Falam sobre o jogo da onça e ensinam a desenhar o tabuleiro e falam das regras.', 'Povos Originários e Tradicionais', 'https://www.youtube.com/watch?v=xMeOgXfWCjg', NULL, 'pendente', '2025-05-31 00:30:16'),
+(7, 'Valci Balbino', 'valcibalbino@gmail.com', NULL, NULL, NULL, NULL, NULL, NULL, 'Mostra de Vídeos 2 - Ensino Médio, Comunidade em geral e Povos Originários e Tradicionais', 'Mostra de vídeos', '221 visualizações  Transmitido ao vivo em 15 de set. de 2023\r\n', 'Professores em Ação', 'https://www.youtube.com/watch?v=H8H85ypw6i4', NULL, 'pendente', '2025-06-01 23:10:47'),
+(8, 'Valci Rodrigues Balbino Jr', 'valcibalbino@gmail.com', 'Rio Claro', 'São Paulo (SP)', '(19) 981660184', 'Colégio Puríssimo - rede ICM', 'Ensino Fundamental, Ensino Médio', 'Privada', 'Matéria da Boa', 'Aborda de forma lúdica e acessível três temas matemáticos principais, todos muito relevantes para o ', 'Animação que ilustra uma antiga sala de aula, onde o professor Büttner desafia seus alunos com uma tarefa aparentemente cansativa: \"Some de 1 até 100\". As crianças ficam confusas e desanimadas, exceto um menino — Gauss, que, com um sorriso confiante, rapidamente encontra uma solução engenhosa.', 'Professores em Ação', 'https://youtu.be/Musz7xjhUV0', '{\"autores\": \"Valci Rodrigues Balbino Junior\", \"sobre_autores\": \"Professor de matemática, com formação em Licenciatura em Matemática e Bacharelado em Tecnologia da Informação. Atualmente, é doutorando em Educação Matemática e integra o grupo de pesquisa GPIMEM focado no uso de novas tecnologias nesse campo. Reside e trabalha em Rio Claro, SP, e tem se dedicado a projetos que unem matemática, pensamento computacional e robótica educacional, especialmente no contexto de escolas públicas com poucos recursos tecnológicos.\", \"relacao_autores\": \"Sou um dos autores\", \"experiencia\": \"Avançado\", \"usa_ia\": \"Sim\", \"participacao\": \"Sim\"}', 'pendente', '2025-06-03 02:16:53');
+
+--
+-- Índices para tabelas despejadas
+--
+
+--
+-- Índices de tabela `avaliacoes`
+--
+ALTER TABLE `avaliacoes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `id_user` (`id_user`),
+  ADD KEY `id_video` (`id_video`);
+
+--
+-- Índices de tabela `options`
+--
+ALTER TABLE `options`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `option_name` (`option_name`);
+
+--
+-- Índices de tabela `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `email` (`email`);
+
+--
+-- Índices de tabela `videos`
+--
+ALTER TABLE `videos`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- AUTO_INCREMENT para tabelas despejadas
+--
+
+--
+-- AUTO_INCREMENT de tabela `avaliacoes`
+--
+ALTER TABLE `avaliacoes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT de tabela `options`
+--
+ALTER TABLE `options`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT de tabela `users`
+--
+ALTER TABLE `users`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT de tabela `videos`
+--
+ALTER TABLE `videos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- Restrições para tabelas despejadas
+--
+
+--
+-- Restrições para tabelas `avaliacoes`
+--
+ALTER TABLE `avaliacoes`
+  ADD CONSTRAINT `avaliacoes_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id`),
+  ADD CONSTRAINT `avaliacoes_ibfk_2` FOREIGN KEY (`id_video`) REFERENCES `videos2` (`id`);
+COMMIT;
