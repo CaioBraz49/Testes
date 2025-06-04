@@ -5,47 +5,29 @@ ini_set('display_errors', 1);
 
 session_start();
 
-// Verifica se o usuário está logado e é um avaliador
-if (!isset($_SESSION['user_id']) || $_SESSION['user_tipo'] !== 'avaliador') {
+// MODIFICADO: A condição original aqui era para 'avaliador', mas o nome do arquivo é admin/index.php
+// Se este arquivo é de fato para AVALIADORES, a condição abaixo está correta.
+// Se este arquivo for para ADMINS, a condição deve ser $_SESSION['user_tipo'] !== 'admin'
+if (!isset($_SESSION['user_id']) || $_SESSION['user_tipo'] !== 'avaliador') { //
     header('Location: ../index.php');
     exit();
 }
 
-// Inclui o arquivo de configuração e verifica a conexão PDO
-require_once '../includes/config.php';
+require_once '../includes/config.php'; //
 
-// Variáveis locais (abra variáveis de ambiente depois de config.php)
-$apikey_youtube = $env['FEST_APIKEY_YOUTUBE'] ?? '';
-
-if (!isset($pdo) || !($pdo instanceof PDO)) {
+if (!isset($pdo) || !($pdo instanceof PDO)) { //
     die("Erro: Conexão com o banco de dados não estabelecida");
 }
 
-$user_id = $_SESSION['user_id']; // Definido uma vez
+$user_id = $_SESSION['user_id']; //
 
-// ITEM 1: Buscar o limite global e contagem do avaliador
-$stmt_limite = $pdo->query("SELECT option_value FROM options WHERE option_name = 'limite_videos'");
-$limite_global_row = $stmt_limite->fetch(PDO::FETCH_ASSOC);
-$limite_global_avaliacoes = $limite_global_row ? (int)$limite_global_row['option_value'] : 0;
-
-$stmt_contagem_avaliacoes = $pdo->prepare("SELECT COUNT(*) FROM avaliacoes WHERE id_user = :user_id");
-$stmt_contagem_avaliacoes->execute([':user_id' => $user_id]);
-$avaliacoes_realizadas_pelo_usuario = $stmt_contagem_avaliacoes->fetchColumn();
-
-$avaliacoes_restantes = $limite_global_avaliacoes - $avaliacoes_realizadas_pelo_usuario;
-
-// Salva em SESSÃO para fácil acesso no HTML e lógica subsequente
-$_SESSION['avaliacoes_realizadas'] = $avaliacoes_realizadas_pelo_usuario;
-$_SESSION['limite_global_avaliacoes'] = $limite_global_avaliacoes;
-$_SESSION['avaliacoes_restantes'] = $avaliacoes_restantes;
-
-// Buscar as categorias do usuário logado (necessário para filtrar vídeos)
-$sql_user_categorias = "SELECT categoria FROM users WHERE id = :id";
+// 1. BUSCAR CATEGORIAS ATRIBUÍDAS DO USUÁRIO E NORMALIZAR CHAVES
+$sql_user_categorias = "SELECT categoria FROM users WHERE id = :id"; //
 $stmt_user_categorias = $pdo->prepare($sql_user_categorias);
 $stmt_user_categorias->execute([':id' => $user_id]);
-$user_info = $stmt_user_categorias->fetch(); // Usar $user_info para não confundir com $user de outros contextos
+$user_info = $stmt_user_categorias->fetch(); //
 
-if (!$user_info || empty($user_info['categoria'])) {
+if (!$user_info || empty(trim($user_info['categoria'] ?? ''))) { //
     die("
             Nenhuma categoria encontrada para este usuário
             <script>
@@ -54,107 +36,221 @@ if (!$user_info || empty($user_info['categoria'])) {
                 window.location.href = '../includes/logout.php';
             }, 5000);
         </script>
-    "); //
+    ");
 }
 
-// Mapear códigos para nomes completos das categorias do usuário
-$mapa_categorias = [
+// Mapa padrão de NOVAS CHAVES para NOVOS NOMES COMPLETOS (usado em todo o script)
+$mapa_categorias_atualizado = [ //
     'anos_finais_ef' => 'Anos Finais do Ensino Fundamental',
     'ensino_medio' => 'Ensino Médio',
     'grad_mat_afins' => 'Graduandos em Matemática ou áreas afins',
     'prof_acao' => 'Professores em Ação',
     'povos_orig_trad' => 'Povos Originários e Tradicionais',
     'com_geral' => 'Comunidade em Geral',
-]; //
+];
 
-$categorias_convertidas = [];
-$categorias_codigo = explode(',', $user_info['categoria']);
+// Mapa para converter CHAVES ANTIGAS para CHAVES NOVAS
+$mapa_chaves_antigas_para_novas = [ //
+    'ensino_fundamental'    => 'anos_finais_ef',
+    'graduandos_matematica' => 'grad_mat_afins',
+    'professores_acao'      => 'prof_acao',      
+    'povos_originarios'     => 'povos_orig_trad',
+    'comunidade_geral'      => 'com_geral',
+];
 
-foreach ($categorias_codigo as $codigo) {
-    $codigo_trim = trim($codigo); // Renomear para evitar conflito
-    if (isset($mapa_categorias[$codigo_trim])) {
-        $categorias_convertidas[] = $mapa_categorias[$codigo_trim];
+$chaves_raw_do_banco = explode(',', $user_info['categoria']); //
+$categorias_atribuidas_chaves_normalizadas = [];
+$processed_keys_for_user_temp = [];
+
+foreach ($chaves_raw_do_banco as $chave_raw) { //
+    $chave_atual_trim = trim($chave_raw);
+    if (empty($chave_atual_trim)) {
+        continue;
+    }
+
+    $chave_final_para_uso = $chave_atual_trim; 
+
+    if (isset($mapa_chaves_antigas_para_novas[$chave_atual_trim])) { //
+        $chave_final_para_uso = $mapa_chaves_antigas_para_novas[$chave_atual_trim];
+    }
+
+    if (isset($mapa_categorias_atualizado[$chave_final_para_uso]) && !in_array($chave_final_para_uso, $processed_keys_for_user_temp)) { //
+        $categorias_atribuidas_chaves_normalizadas[] = $chave_final_para_uso;
+        $processed_keys_for_user_temp[] = $chave_final_para_uso; 
+    }
+}
+$categorias_atribuidas_chaves = $categorias_atribuidas_chaves_normalizadas; //
+
+
+// >>> INÍCIO DA MODIFICAÇÃO SUGERIDA <<<
+// Gerar lista de NOMES COMPLETOS (NOVOS e ANTIGOS correspondentes) para a consulta SQL
+$categorias_para_sql_query = [];
+
+// Mapa de nomes de categoria NOVOS para os ANTIGOS correspondentes (para a consulta SQL)
+// Estes são os NOMES DE EXIBIÇÃO COMPLETOS
+$mapa_nomes_novos_para_antigos_sql = [
+    'Anos Finais do Ensino Fundamental' => 'Ensino Fundamental',
+    'Graduandos em Matemática ou áreas afins' => 'Graduandos em Matemática',
+    'Povos Originários e Tradicionais' => 'Povos Originários'
+    // Adicione outros NOMES NOVOS que tenham NOMES ANTIGOS distintos
+    // Se um nome novo não tem um antigo distinto, não precisa estar aqui.
+];
+
+if (!empty($categorias_atribuidas_chaves)) {
+    foreach ($categorias_atribuidas_chaves as $cat_key_nova) {
+        // $cat_key_nova já é uma chave nova validada e presente em $mapa_categorias_atualizado
+        $nome_categoria_nova_atual = $mapa_categorias_atualizado[$cat_key_nova];
+        $categorias_para_sql_query[] = $nome_categoria_nova_atual; // Adiciona o nome novo
+
+        // Verifica se existe um nome antigo correspondente para este nome novo e o adiciona
+        if (isset($mapa_nomes_novos_para_antigos_sql[$nome_categoria_nova_atual])) {
+            $nome_categoria_antiga_equivalente = $mapa_nomes_novos_para_antigos_sql[$nome_categoria_nova_atual];
+            // Adiciona o nome antigo apenas se for realmente diferente do novo
+            if ($nome_categoria_antiga_equivalente !== $nome_categoria_nova_atual) {
+                $categorias_para_sql_query[] = $nome_categoria_antiga_equivalente;
+            }
+        }
+    }
+}
+$categorias_para_sql_query = array_unique($categorias_para_sql_query); // Garante que não haja duplicatas
+
+// Gerar lista de NOMES COMPLETOS apenas das categorias NOVAS atribuídas (para exibição e lógica de cotas)
+$categorias_atribuidas_nomes_novos_apenas = [];
+if (!empty($categorias_atribuidas_chaves)) {
+    foreach ($categorias_atribuidas_chaves as $cat_key_nova) {
+        $categorias_atribuidas_nomes_novos_apenas[] = $mapa_categorias_atualizado[$cat_key_nova];
+    }
+}
+// >>> FIM DA MODIFICAÇÃO SUGERIDA <<<
+
+
+if (empty($categorias_atribuidas_chaves) && !empty($user_info['categoria'])) { //
+    die("Nenhuma categoria válida foi identificada para o seu perfil após a normalização das chaves. Por favor, contate o administrador. (Perfil: ".htmlspecialchars($user_info['categoria']).")");
+}
+
+$mapa_categorias = $mapa_categorias_atualizado; //
+
+
+// Buscar cotas (limites) do usuário por categoria (USA AS NOVAS CHAVES)
+$user_quotas_por_categoria = [];
+if (!empty($categorias_atribuidas_chaves)) { //
+    $in_placeholders_quotas = implode(',', array_fill(0, count($categorias_atribuidas_chaves), '?'));
+    $sql_quotas = "SELECT category_key, quota FROM evaluator_category_quotas WHERE user_id = ? AND category_key IN ($in_placeholders_quotas)"; //
+    $stmt_quotas = $pdo->prepare($sql_quotas);
+    $params_quotas = array_merge([$user_id], $categorias_atribuidas_chaves); //
+    $stmt_quotas->execute($params_quotas);
+    while ($row_quota = $stmt_quotas->fetch(PDO::FETCH_ASSOC)) { //
+        $user_quotas_por_categoria[$row_quota['category_key']] = (int)$row_quota['quota'];
     }
 }
 
-if (empty($categorias_convertidas)) {
-    die("Nenhuma categoria válida encontrada para este usuário"); //
+// Contar avaliações feitas pelo usuário por categoria (USA OS NOVOS NOMES COMPLETOS)
+$user_eval_counts_por_categoria_nome = [];
+// MODIFICADO: Usar $categorias_atribuidas_nomes_novos_apenas para esta contagem,
+// ou ajustar a lógica para agrupar por chave se a contagem deve considerar vídeos de nomes antigos como parte da cota da categoria nova.
+// Para simplificar e ser consistente com a lógica de cotas baseada em NOVAS CHAVES, vamos usar $categorias_atribuidas_nomes_novos_apenas.
+if (!empty($categorias_atribuidas_nomes_novos_apenas)) { //
+    $in_placeholders_counts = implode(',', array_fill(0, count($categorias_atribuidas_nomes_novos_apenas), '?'));
+    $sql_counts = "
+        SELECT v.categoria AS video_category_name, COUNT(a.id) as count
+        FROM avaliacoes a
+        JOIN videos v ON a.id_video = v.id
+        WHERE a.id_user = ? AND v.categoria IN ($in_placeholders_counts)
+        GROUP BY v.categoria
+    "; //
+    $stmt_counts = $pdo->prepare($sql_counts);
+    $params_counts = array_merge([$user_id], $categorias_atribuidas_nomes_novos_apenas); //
+    $stmt_counts->execute($params_counts);
+    while ($row_count = $stmt_counts->fetch(PDO::FETCH_ASSOC)) { //
+        $user_eval_counts_por_categoria_nome[$row_count['video_category_name']] = (int)$row_count['count'];
+    }
 }
 
-// Buscar vídeos pendentes de avaliação (APENAS SE O USUÁRIO AINDA PODE AVALIAR)
-$videos_pendentes = [];
-if ($_SESSION['avaliacoes_restantes'] > 0) { // Só busca vídeos se o avaliador ainda pode avaliar
-    $placeholders_sql = implode(',', array_fill(0, count($categorias_convertidas), '?'));
+// Mapear contagens para chaves de categoria (NOVAS CHAVES) para uso interno consistente
+$user_eval_counts_por_categoria_chave = [];
+foreach ($categorias_atribuidas_chaves as $cat_key_nova) { //
+    $cat_nome_novo_correspondente = $mapa_categorias[$cat_key_nova];
+    $user_eval_counts_por_categoria_chave[$cat_key_nova] = $user_eval_counts_por_categoria_nome[$cat_nome_novo_correspondente] ?? 0;
+}
 
-    // NOVA CONSULTA SQL
+
+// LÓGICA PARA BUSCAR VÍDEOS PENDENTES
+$videos_pendentes = [];
+// MODIFICADO: Usar $categorias_para_sql_query que contém nomes novos e antigos mapeados
+if (!empty($categorias_para_sql_query)) { //
+    $placeholders_sql_videos = implode(',', array_fill(0, count($categorias_para_sql_query), '?'));
     $sql_videos = "
         SELECT v.*
         FROM videos v
-        WHERE
-        (
-            (
-                v.status = 'pendente'
-                AND (SELECT COUNT(*) FROM avaliacoes a WHERE a.id_video = v.id) < 2
-            )
-            OR
-            (
-                v.status = 'reavaliar'
-                AND (SELECT COUNT(*) FROM avaliacoes a WHERE a.id_video = v.id) < 3
-            )
+        WHERE (
+            (v.status = 'pendente' AND (SELECT COUNT(*) FROM avaliacoes a WHERE a.id_video = v.id) < 2) OR
+            (v.status = 'reavaliar' AND (SELECT COUNT(*) FROM avaliacoes a WHERE a.id_video = v.id) < 3)
         )
-        AND v.categoria IN ($placeholders_sql)
-        AND v.id NOT IN (
-            SELECT id_video
-            FROM avaliacoes
-            WHERE id_user = ?
-        )
+        AND v.categoria IN ($placeholders_sql_videos) -- MODIFICADO para usar a lista expandida
+        AND v.id NOT IN (SELECT id_video FROM avaliacoes WHERE id_user = ?)
         ORDER BY v.created_at ASC
-    ";
-
+    "; //
     $stmt_videos = $pdo->prepare($sql_videos);
-    // Os parâmetros para a consulta são as categorias + o user_id
-    $params_sql = array_merge($categorias_convertidas, [$user_id]);
-    $stmt_videos->execute($params_sql);
-    $videos_pendentes = $stmt_videos->fetchAll(PDO::FETCH_ASSOC);
+    // MODIFICADO: $params_sql_videos agora usa $categorias_para_sql_query
+    $params_sql_videos = array_merge($categorias_para_sql_query, [$user_id]); //
+    $stmt_videos->execute($params_sql_videos);
+    $videos_pendentes = $stmt_videos->fetchAll(PDO::FETCH_ASSOC); //
 }
 
 
-// Processar avaliação se o formulário foi enviado 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['avaliar'])) {
-    $id_video = intval($_POST['id_video']);
-    $id_user = $_SESSION['user_id']; // $id_user é o mesmo que $user_id da sessão
+// PROCESSAMENTO DO FORMULÁRIO DE AVALIAÇÃO (POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['avaliar'])) { //
+    $id_video_avaliado = intval($_POST['id_video']); //
 
-    // Recarregar contagem e limite AQUI para garantir a verificação mais atualizada no momento do POST.
-    // Isso evita que o usuário abra o formulário, outro processo altere seu limite/contagem, e ele consiga submeter.
+    $stmt_video_cat_post = $pdo->prepare("SELECT categoria FROM videos WHERE id = :id_video"); //
+    $stmt_video_cat_post->execute([':id_video' => $id_video_avaliado]);
+    $video_category_name_post = $stmt_video_cat_post->fetchColumn(); //
 
-    $stmt_limite_post = $pdo->query("SELECT option_value FROM options WHERE option_name = 'limite_videos'");
-    $limite_global_post_row = $stmt_limite_post->fetch(PDO::FETCH_ASSOC);
-    $limite_global_avaliacoes_post = $limite_global_post_row ? (int)$limite_global_post_row['option_value'] : 0;
+    if ($video_category_name_post) { //
+        // Normaliza o nome da categoria do vídeo para sua CHAVE NOVA correspondente
+        $video_category_key_post = array_search($video_category_name_post, $mapa_categorias); // Procura no mapa de nomes NOVOS
+        
+        // Se não encontrou, pode ser um nome ANTIGO de categoria no vídeo
+        if ($video_category_key_post === false) {
+            // Tenta encontrar a CHAVE NOVA correspondente ao NOME ANTIGO do vídeo
+            $nome_novo_equivalente_para_video_antigo = array_search($video_category_name_post, $mapa_nomes_novos_para_antigos_sql);
+            if($nome_novo_equivalente_para_video_antigo !== false) {
+                 $video_category_key_post = array_search($nome_novo_equivalente_para_video_antigo, $mapa_categorias);
+            }
+        }
 
-    $stmt_contagem_post = $pdo->prepare("SELECT COUNT(*) FROM avaliacoes WHERE id_user = :user_id");
-    $stmt_contagem_post->execute([':user_id' => $id_user]);
-    $avaliacoes_realizadas_post = $stmt_contagem_post->fetchColumn();
 
-    if ($avaliacoes_realizadas_post >= $limite_global_avaliacoes_post && $limite_global_avaliacoes_post != 0) {
-        $_SESSION['error'] = "Você atingiu o limite de " . htmlspecialchars($limite_global_avaliacoes_post) . " avaliações e não pode submeter novas avaliações.";
-        // Redireciona de volta para a página do avaliador (index.php ou dashboard.php dependendo da sua estrutura)
-        // O action do seu formulário é "dashboard.php", então vamos usar isso.
-        // Se o nome do arquivo atual for index.php, pode usar header("Location: index.php");
-        header("Location: index.php"); // Ou o action do seu formulário    // AQUI ESTAVA dashboard.php
+        if ($video_category_key_post !== false && in_array($video_category_key_post, $categorias_atribuidas_chaves)) { //
+            $quota_para_categoria = $user_quotas_por_categoria[$video_category_key_post] ?? null; 
+            $contagem_atual_na_categoria = $user_eval_counts_por_categoria_chave[$video_category_key_post] ?? 0;
+
+            if ($quota_para_categoria !== null && $contagem_atual_na_categoria >= $quota_para_categoria) { //
+                $_SESSION['error'] = "Você já atingiu seu limite de " . htmlspecialchars($quota_para_categoria) . 
+                                     " avaliações para a categoria '" . htmlspecialchars($mapa_categorias[$video_category_key_post]) . "'. Sua avaliação não foi submetida."; // Exibe o nome novo
+                header("Location: index.php");
+                exit();
+            }
+        } else {
+            $_SESSION['error'] = "Tentativa de avaliar vídeo de categoria não permitida ou inválida ('" . htmlspecialchars($video_category_name_post) . "'). Certifique-se que esta categoria está atribuída ao seu perfil."; //
+            header("Location: index.php");
+            exit();
+        }
+    } else {
+        $_SESSION['error'] = "Vídeo (ID: ".htmlspecialchars($id_video_avaliado).") não encontrado para verificar limite de categoria."; //
+        header("Location: index.php");
         exit();
     }
 
-    // Se passou na verificação, continua para montar o array $avaliacao e inserir no banco
-    $avaliacao = [
-        'id_user' => $id_user,
-        'id_video' => $id_video,
-        'conceitos_corretos' => isset($_POST['conceitos_matematicos_status']) ? (int)$_POST['conceitos_matematicos_status'] : 0, // Pega o valor do radio (0 ou 1)
+    $avaliacao = [ //
+        'id_user' => $user_id,
+        'id_video' => $id_video_avaliado,
+        'conceitos_corretos' => isset($_POST['conceitos_matematicos_status']) ? (int)$_POST['conceitos_matematicos_status'] : 0,
         'comentario_conceitos' => $_POST['comentario_conceitos'] ?? '',
-        'tempo_respeitado' => isset($_POST['tempo_respeitado']) ? 1 : 0,
+        'tempo_respeitado' => isset($_POST['tempo_status']) ? (int)$_POST['tempo_status'] : 0,
         'comentario_tempo' => $_POST['comentario_tempo'] ?? '',
-        'possui_titulo' => isset($_POST['titulo_status']) ? (int)$_POST['titulo_status'] : 0, // 1 se sim, 0 se não
+        'possui_titulo' => isset($_POST['titulo_status']) ? (int)$_POST['titulo_status'] : 0,
         'comentario_titulo' => $_POST['comentario_titulo'] ?? '',
-        'possui_creditos' => isset($_POST['creditos_status']) ? (int)$_POST['creditos_status'] : 0, // 1 se sim, 0 se não
+        'possui_creditos' => isset($_POST['creditos_status']) ? (int)$_POST['creditos_status'] : 0,
         'comentario_creditos' => $_POST['comentario_creditos'] ?? '',
         'discurso_adequado' => isset($_POST['discurso_status']) ? (int)$_POST['discurso_status'] : 0,
         'comentario_discurso' => $_POST['comentario_discurso'] ?? '',
@@ -168,11 +264,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['avaliar'])) {
         'comentario_portugues' => $_POST['comentario_portugues'] ?? '',
         'parecer' => $_POST['parecer'],
         'justificativa' => $_POST['justificativa'] ?? ''
-    ]; //
+    ];
 
-    try {
+    try { //
         $pdo->beginTransaction();
-        $sql_avaliacao = "INSERT INTO avaliacoes (
+        $sql_insert_avaliacao = "INSERT INTO avaliacoes (
             id_user, id_video, 
             conceitos_corretos, comentario_conceitos, 
             tempo_respeitado, comentario_tempo,
@@ -196,154 +292,165 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['avaliar'])) {
             :edicao_correta, :comentario_edicao, 
             :portugues_correto, :comentario_portugues, 
             :parecer, :justificativa
-        )"; 
-        $stmt = $pdo->prepare($sql_avaliacao);
-        $stmt->execute($avaliacao);
+        )"; //
+        $stmt_insert = $pdo->prepare($sql_insert_avaliacao);
+        $stmt_insert->execute($avaliacao);
 
-        // 2. Obter o status do vídeo ANTES desta avaliação ser considerada para decisão
-        //    e o número total de avaliações AGORA (incluindo a que acabamos de inserir).
         $stmt_info_video = $pdo->prepare(
             "SELECT status, (SELECT COUNT(*) FROM avaliacoes WHERE id_video = v.id) as num_avaliacoes 
              FROM videos v WHERE v.id = :id_video"
-        );
-        $stmt_info_video->execute([':id_video' => $id_video]);
-        $video_info_atual = $stmt_info_video->fetch(PDO::FETCH_ASSOC);
+        ); //
+        $stmt_info_video->execute([':id_video' => $id_video_avaliado]);
+        $video_info_atual = $stmt_info_video->fetch(PDO::FETCH_ASSOC); //
 
-        $status_video_antes_desta_logica = $video_info_atual['status'];
+        $status_video_antes_desta_logica = $video_info_atual['status']; 
         $num_avaliacoes_agora = $video_info_atual['num_avaliacoes'];
-        $status_final_a_definir_no_video = null;
-        $_SESSION['info'] = ''; // Limpar mensagem de info
+        
+        $status_final_a_definir_no_video = null; 
+        $_SESSION['info'] = ''; 
 
-        // ESTA É A LÓGICA DE DECISÃO CORRETA E COMPLETA
-        if ($status_video_antes_desta_logica === 'reavaliar') {
-            // Vídeo JÁ ESTAVA em 'reavaliar'. A avaliação atual é a 3ª.
-            if ($num_avaliacoes_agora == 3) {
-                $terceiro_parecer = $avaliacao['parecer']; // Parecer da avaliação atual (a 3ª)
-
-                if ($terceiro_parecer === 'aprovado' || $terceiro_parecer === 'aprovado_classificado') {
+        if ($status_video_antes_desta_logica === 'reavaliar') { //
+            if ($num_avaliacoes_agora == 3) { 
+                $terceiro_parecer = $avaliacao['parecer'];
+                if ($terceiro_parecer === 'aprovado' || $terceiro_parecer === 'aprovado_classificado') { //
                     $status_final_a_definir_no_video = 'aprovado';
-                    $_SESSION['info'] = "Reavaliação (3º parecer) concluída. Vídeo APROVADO.";
-                } elseif ($terceiro_parecer === 'reprovado') {
+                    $_SESSION['info'] = "Reavaliação (3º parecer) concluída. Vídeo APROVADO."; //
+                } elseif ($terceiro_parecer === 'reprovado') { //
                     $status_final_a_definir_no_video = 'reprovado';
-                    $_SESSION['info'] = "Reavaliação (3º parecer) concluída. Vídeo REPROVADO.";
-                } elseif ($terceiro_parecer === 'correcao') {
+                    $_SESSION['info'] = "Reavaliação (3º parecer) concluída. Vídeo REPROVADO."; //
+                } elseif ($terceiro_parecer === 'correcao') { //
                     $status_final_a_definir_no_video = 'correcao';
-                    $_SESSION['info'] = "Reavaliação (3º parecer) concluída. Vídeo enviado para CORREÇÃO.";
+                    $_SESSION['info'] = "Reavaliação (3º parecer) concluída. Vídeo enviado para CORREÇÃO."; //
                 } else {
-                    $status_final_a_definir_no_video = 'correcao'; // Fallback
-                    $_SESSION['info'] = "Reavaliação (3º parecer) com parecer não padrão (".htmlspecialchars($terceiro_parecer)."). Enviado para análise administrativa.";
+                    $status_final_a_definir_no_video = 'correcao'; 
+                    $_SESSION['info'] = "Reavaliação (3º parecer) com parecer não padrão (".htmlspecialchars($terceiro_parecer)."). Enviado para análise administrativa."; //
                 }
             }
-            // Não são necessárias outras condições para $num_avaliacoes_agora aqui,
-            // pois a query SQL para selecionar vídeos 'reavaliar' agora limita a < 3 avaliações.
-        } elseif ($num_avaliacoes_agora >= 2) {
-            // Vídeo NÃO estava em 'reavaliar' e agora tem 2 ou mais avaliações (normalmente, exatamente 2 neste ponto).
-            // Verifica divergência inicial ou consenso entre as duas primeiras avaliações.
-            $stmt_todas_avaliacoes = $pdo->prepare("SELECT parecer FROM avaliacoes WHERE id_video = :id_video");
-            $stmt_todas_avaliacoes->execute([':id_video' => $id_video]);
-            $lista_pareceres_video = $stmt_todas_avaliacoes->fetchAll(PDO::FETCH_COLUMN);
+        } elseif ($num_avaliacoes_agora >= 2) { 
+            $stmt_todas_avaliacoes = $pdo->prepare("SELECT parecer FROM avaliacoes WHERE id_video = :id_video"); //
+            $stmt_todas_avaliacoes->execute([':id_video' => $id_video_avaliado]);
+            $lista_pareceres_video = $stmt_todas_avaliacoes->fetchAll(PDO::FETCH_COLUMN); //
             
-            $pareceres_normalizados = [];
-            foreach ($lista_pareceres_video as $p) {
-                if ($p === 'aprovado' || $p === 'aprovado_classificado') $pareceres_normalizados[] = 'aprovado_geral';
-                elseif ($p === 'reprovado') $pareceres_normalizados[] = 'reprovado_geral';
-                else $pareceres_normalizados[] = $p; // 'correcao' ou outros
+            $pareceres_normalizados = []; //
+            foreach ($lista_pareceres_video as $p) { //
+                if ($p === 'aprovado' || $p === 'aprovado_classificado') $pareceres_normalizados[] = 'aprovado_geral'; //
+                elseif ($p === 'reprovado') $pareceres_normalizados[] = 'reprovado_geral'; //
+                else $pareceres_normalizados[] = $p; 
             }
-            $pareceres_unicos_normalizados = array_unique($pareceres_normalizados);
+            $pareceres_unicos_normalizados = array_unique($pareceres_normalizados); //
 
-            if (in_array('aprovado_geral', $pareceres_unicos_normalizados) && in_array('reprovado_geral', $pareceres_unicos_normalizados)) {
-                // Divergência encontrada entre as duas primeiras avaliações
+            if (in_array('aprovado_geral', $pareceres_unicos_normalizados) && in_array('reprovado_geral', $pareceres_unicos_normalizados)) { //
                 $status_final_a_definir_no_video = 'reavaliar';
-                $_SESSION['info'] = "Divergência de pareceres. Vídeo enviado para reavaliação (necessitará de 3º parecer).";
+                $_SESSION['info'] = "Divergência de pareceres. Vídeo enviado para reavaliação."; //
             } else {
-                // Não houve divergência clara (ex: ambos aprovados, ambos reprovados, ou um era 'correcao')
-                // Verifica se há consenso de pelo menos 2 pareceres (o que será verdade se ambos foram iguais)
-                $contagem_parecer_atual = 0; // $avaliacao['parecer'] é o parecer da avaliação recém-submetida (a 2ª)
-                $parecer_atual_normalizado = (in_array($avaliacao['parecer'], ['aprovado', 'aprovado_classificado'])) ? 'aprovado_geral' : (($avaliacao['parecer'] === 'reprovado') ? 'reprovado_geral' : $avaliacao['parecer']);
+                $contagem_parecer_atual = 0; //
+                $parecer_atual_normalizado = (in_array($avaliacao['parecer'], ['aprovado', 'aprovado_classificado'])) ? 'aprovado_geral' : (($avaliacao['parecer'] === 'reprovado') ? 'reprovado_geral' : $avaliacao['parecer']); //
                 
-                foreach($pareceres_normalizados as $p_norm) {
+                foreach($pareceres_normalizados as $p_norm) { //
                     if ($p_norm === $parecer_atual_normalizado) $contagem_parecer_atual++;
                 }
 
-                if ($contagem_parecer_atual >= 2) { // Consenso entre as duas primeiras avaliações
-                    if ($parecer_atual_normalizado === 'aprovado_geral') $status_final_a_definir_no_video = 'aprovado';
-                    elseif ($parecer_atual_normalizado === 'reprovado_geral') $status_final_a_definir_no_video = 'reprovado';
-                    elseif ($parecer_atual_normalizado === 'correcao') $status_final_a_definir_no_video = 'correcao';
+                if ($contagem_parecer_atual >= 2) { //
+                    if ($parecer_atual_normalizado === 'aprovado_geral') $status_final_a_definir_no_video = 'aprovado'; //
+                    elseif ($parecer_atual_normalizado === 'reprovado_geral') $status_final_a_definir_no_video = 'reprovado'; //
+                    elseif ($parecer_atual_normalizado === 'correcao') $status_final_a_definir_no_video = 'correcao'; //
                     
-                    if ($status_final_a_definir_no_video && empty($_SESSION['info'])) { 
+                    if ($status_final_a_definir_no_video && empty($_SESSION['info'])) {  //
                         $_SESSION['info'] = "Status do vídeo atualizado para " . htmlspecialchars($status_final_a_definir_no_video) . ".";
                     }
-                } elseif (empty($_SESSION['info'])) { 
-                    // Se não houve divergência direta (aprovado vs reprovado) e nem consenso claro de 2 ainda (ex: 1 aprovado, 1 correção)
-                    // A mensagem padrão de "aguardando mais avaliações" pode não ser ideal aqui se já temos 2.
-                    // Poderia ser, por exemplo, status 'correcao' se um dos pareceres for 'correcao'.
-                    // Por ora, mantemos uma mensagem genérica ou ajustamos conforme a regra de negócio para 2 pareceres não divergentes e não consensuais.
-                    // Se um for 'correcao', talvez o vídeo deva ir para 'correcao'.
-                    if (in_array('correcao', $pareceres_unicos_normalizados)) {
-                        $status_final_a_definir_no_video = 'correcao';
-                        $_SESSION['info'] = "Uma das avaliações sugere correção. Vídeo marcado para CORREÇÃO.";
-                    } else {
-                        $_SESSION['info'] = "Avaliações registradas. Sem divergência clara ou consenso imediato."; // Ou outra mensagem
-                    }
+                } elseif (empty($_SESSION['info'])) {  //
+                     if (in_array('correcao', $pareceres_unicos_normalizados)) { //
+                         $status_final_a_definir_no_video = 'correcao';
+                         $_SESSION['info'] = "Uma das avaliações sugere correção. Vídeo marcado para CORREÇÃO."; //
+                     } else {
+                         $_SESSION['info'] = "Avaliações registradas. Sem divergência clara ou consenso imediato."; //
+                     }
                 }
             }
         } else { 
-            // Esta é a primeira avaliação do vídeo.
-            $_SESSION['info'] = "Avaliação registrada. Aguardando segunda avaliação.";
+            $_SESSION['info'] = "Avaliação registrada. Aguardando segunda avaliação."; //
         }
 
-        // 4. Atualizar o status do vídeo no banco SE um novo status foi definido
-        if ($status_final_a_definir_no_video !== null) {
-            $stmt_update_status_video = $pdo->prepare("UPDATE videos SET status = :status WHERE id = :id_video");
-            $stmt_update_status_video->execute([':status' => $status_final_a_definir_no_video, ':id_video' => $id_video]);
+        if ($status_final_a_definir_no_video !== null) { //
+            $stmt_update_status_video = $pdo->prepare("UPDATE videos SET status = :status WHERE id = :id_video"); //
+            $stmt_update_status_video->execute([':status' => $status_final_a_definir_no_video, ':id_video' => $id_video_avaliado]);
         }
 
-        $pdo->commit();
-        $_SESSION['success'] = "Avaliação enviada com sucesso! " . ($_SESSION['info'] ?? '');
-        unset($_SESSION['info']); // Limpa a info para a próxima
+        $pdo->commit(); //
+        $_SESSION['success'] = "Avaliação enviada com sucesso! " . ($_SESSION['info'] ?? ''); //
+        unset($_SESSION['info']); 
         header("Location: index.php"); 
         exit();
 
-    } catch (PDOException $e) { // O ERRO ESTÁ NESSA LINHA
+    } catch (PDOException $e) {  //
         $pdo->rollBack(); 
-        $_SESSION['error'] = "Erro ao enviar avaliação: " . $e->getMessage(); 
+        $_SESSION['error'] = "Erro ao enviar avaliação: " . $e->getMessage();  //
+        header("Location: index.php");
+        exit();
     }
 }
 
-// Se um vídeo específico foi selecionado para avaliação
+// VERIFICAÇÃO DE LIMITE AO TENTAR ABRIR UM VÍDEO (GET)
 $video_atual = null;
-if (isset($_GET['avaliar'])) {
-    if ($_SESSION['avaliacoes_restantes'] <= 0 && $limite_global_avaliacoes != 0) {
-        $_SESSION['error'] = "Você atingiu seu limite de avaliações e não pode iniciar uma nova avaliação.";
-    } else {
-        try {
-            $video_id_get = intval($_GET['avaliar']); // Renomear para evitar conflito com $id_video do POST
-            $stmt_video_atual = $pdo->prepare("SELECT * FROM videos WHERE id = :id");
-            $stmt_video_atual->execute(['id' => $video_id_get]);
-            $video_atual = $stmt_video_atual->fetch(PDO::FETCH_ASSOC);
-            if (!$video_atual) {
-                 $_SESSION['error'] = "Vídeo não encontrado.";
+if (isset($_GET['avaliar'])) { //
+    $video_id_para_avaliar = intval($_GET['avaliar']); //
+    
+    $stmt_video_info_get = $pdo->prepare("SELECT * FROM videos WHERE id = :id"); //
+    $stmt_video_info_get->execute(['id' => $video_id_para_avaliar]);
+    $video_atual_get = $stmt_video_info_get->fetch(PDO::FETCH_ASSOC); //
+
+    if ($video_atual_get) { //
+        $video_category_name_get = $video_atual_get['categoria']; //
+        
+        // Normaliza o nome da categoria do vídeo para sua CHAVE NOVA correspondente
+        $video_category_key_get = array_search($video_category_name_get, $mapa_categorias); // Procura no mapa de nomes NOVOS
+        if ($video_category_key_get === false) {
+            // Tenta encontrar a CHAVE NOVA correspondente ao NOME ANTIGO do vídeo
+             $nome_novo_equivalente_para_video_antigo_get = array_search($video_category_name_get, $mapa_nomes_novos_para_antigos_sql);
+            if($nome_novo_equivalente_para_video_antigo_get !== false) {
+                 $video_category_key_get = array_search($nome_novo_equivalente_para_video_antigo_get, $mapa_categorias);
             }
-        } catch (PDOException $e) {
-            $_SESSION['error'] = "Erro ao buscar vídeo: " . $e->getMessage();
-            $video_atual = null;
         }
+
+
+        if ($video_category_key_get !== false && in_array($video_category_key_get, $categorias_atribuidas_chaves)) { //
+            $quota_para_categoria_get = $user_quotas_por_categoria[$video_category_key_get] ?? null; //
+            $contagem_na_categoria_get = $user_eval_counts_por_categoria_chave[$video_category_key_get] ?? 0; //
+
+            if ($quota_para_categoria_get !== null && $contagem_na_categoria_get >= $quota_para_categoria_get) { //
+                $_SESSION['error'] = "Você atingiu o limite de ".htmlspecialchars($quota_para_categoria_get)." avaliações para a categoria '".htmlspecialchars($mapa_categorias[$video_category_key_get])."'."; // Exibe o nome novo
+                header('Location: index.php');
+                exit();
+            } else {
+                $video_atual = $video_atual_get; //
+            }
+        } else {
+            $_SESSION['error'] = "Vídeo de categoria não permitida ou inválida para avaliação."; //
+            header('Location: index.php');
+            exit();
+        }
+    } else {
+        $_SESSION['error'] = "Vídeo (ID: ".htmlspecialchars($video_id_para_avaliar).") não encontrado para avaliação."; //
+        header('Location: index.php');
+        exit();
     }
 }
-// Função para extrair o ID do vídeo do YouTube de qualquer formato de URL
-function extrairIdYouTube($url) {
+
+function extrairIdYouTube($url) { //
     $padrao = '%
         (?:youtu\.be/|youtube\.com/
         (?:embed/|v/|watch\?v=|watch\?.+&v=))
         ([^"&?/\s]{11})
     %xi';
-    
+
     if (preg_match($padrao, $url, $matches)) {
         return $matches[1]; // Retorna o ID de 11 caracteres
     }
     return null; // Retorna null se não encontrar
 }
+
 ?>
+
 
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -351,10 +458,9 @@ function extrairIdYouTube($url) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel do Avaliador - Festival de Vídeos</title>
-    <!-- CSS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="../includes/estilo.css?v=<?php echo time(); ?>">
     <style>
         .video-container {
@@ -383,7 +489,8 @@ function extrairIdYouTube($url) {
         }
         .form-check-label {
             cursor: pointer;
-        }
+        /* Esta parte estava com um ponto final antes da classe, o que a torna inválida em CSS. Removido. */
+        } /* Fechamento do .form-check-label que estava aberto */
         .yt a.text-white {
             color: white !important;
             text-decoration: underline;
@@ -400,46 +507,58 @@ function extrairIdYouTube($url) {
 <div class="content-wrapper">
     <div class="container-fluid flex-grow-1 mt-0">
         <div class="row">
-            <!-- Sidebar -->
             <nav class="col-md-2 d-none d-md-block bg-light sidebar">
                 <div class="sidebar-sticky">
                     <ul class="nav flex-column">
-                        <!--li class="nav-item">
-                            <a class="nav-link active" href="">
-                                <i class="fas fa-user mr-2"></i> User Teste
-                            </a>
-                        </li!-->
-                    <ul class="nav flex-column">
+                        <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link active" href="../Regulamento_FVDEM_2025.pdf" target="_blank" rel="noopener noreferrer">
-                                <i class="bi bi-file-earmark-pdf"></i> Regulamento
+                            <a class="nav-link active" href="index.php">
+                                <i class="fas fa-home mr-2"></i> Dashboard
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="index.php">
-                                <i class="fas fa-video mr-2"></i> Atualizar Lista
+                            <a class="nav-link" href="#"> <i class="fas fa-video mr-2"></i> Atualizar Vídeo
                             </a>
                     </ul>
                 </div>
             </nav>
 
-            <!-- Main Content -->
             <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">Avaliação de Vídeos</h1>
                 </div>
 
                 <div class="alert alert-info">
-                    Você já realizou: <strong><?php echo htmlspecialchars($_SESSION['avaliacoes_realizadas']); ?></strong> avaliação(ões).<br>
-                    Seu limite de avaliações é: <strong><?php echo htmlspecialchars($_SESSION['limite_global_avaliacoes']); ?></strong>.<br>
-                    <?php if ($_SESSION['avaliacoes_restantes'] > 0): ?>
-                        Você ainda pode avaliar: <strong><?php echo htmlspecialchars($_SESSION['avaliacoes_restantes']); ?></strong> vídeo(s).
+                    <strong>Seus Limites de Avaliação por Categoria:</strong><br>
+                    <?php if (empty($categorias_atribuidas_chaves)): ?>
+                        Nenhuma categoria atribuída a você no momento.
                     <?php else: ?>
-                        <strong>Você atingiu o seu limite de avaliações. Obrigado pela sua contribuição!</strong>
+                        <ul class="list-unstyled mb-0">
+                        <?php foreach ($categorias_atribuidas_chaves as $cat_key): ?>
+                            <?php
+                                $cat_nome_display = isset($mapa_categorias[$cat_key]) ? $mapa_categorias[$cat_key] : htmlspecialchars($cat_key) . ' (Chave desconhecida)';
+                                $quota = $user_quotas_por_categoria[$cat_key] ?? null; 
+                                $count = $user_eval_counts_por_categoria_chave[$cat_key] ?? 0;
+                                $quota_display = ($quota === null) ? "Ilimitado" : $quota;
+                                
+                                $restantes_display = "N/A";
+                                if ($quota !== null) {
+                                    $restantes_num = max(0, $quota - $count);
+                                    $restantes_display = $restantes_num;
+                                } elseif ($quota === null) { 
+                                    $restantes_display = "Ilimitadas";
+                                }
+                            ?>
+                            <li>
+                                <strong><?= htmlspecialchars($cat_nome_display) ?>:</strong> 
+                                Realizadas <?= $count ?> de <?= $quota_display ?>. 
+                                (Restantes: <?= $restantes_display ?>)
+                            </li>
+                        <?php endforeach; ?>
+                        </ul>
                     <?php endif; ?>
                 </div>
 
-                <!-- Mensagens de Sucesso/Erro -->
                 <?php if (isset($_SESSION['success'])): ?>
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
                         <?= htmlspecialchars($_SESSION['success']) ?>
@@ -460,7 +579,6 @@ function extrairIdYouTube($url) {
 
 
                 <?php if (isset($video_atual)): ?>
-                    <!-- Formulário de Avaliação para um vídeo específico -->
                     <div class="card mb-4">
                         <div class="card-header card-header-custom-purple text-white yt">
                             <h5 class="mb-0">Avaliando: 
@@ -472,17 +590,21 @@ function extrairIdYouTube($url) {
                         </div>
                         <div class="card-body">
                             <div class="video-container">
-                                <iframe  width="420" height="315"
-                                    src="https://www.youtube.com/embed/<?= extrairIdYouTube($video_atual['link_youtube']) ?>" 
-                                    title="Vídeo do YouTube"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                    allowfullscreen>
+                                <?php
+                                function convertToEmbedUrl($url) { //
+                                    return str_replace('watch?v=', 'embed/', $url);
+                                }
+                                ?>
+
+                                <iframe width="420" height="315"
+                                    src="<?= htmlspecialchars(convertToEmbedUrl($video_atual['link_youtube'])) ?>">
                                 </iframe>
+
                             </div>
-                            <form action="index.php" method="post"> <!-- AQUI ESTAVA dashboard.php -->
+
+                            <form action="index.php" method="post">
                                 <input type="hidden" name="id_video" value="<?= $video_atual['id'] ?>">
                                 
-                                <!-- Critérios de Avaliação -->
                                 <div class="criteria-box">
                                     <div class="criteria-title">1. Conteúdo Matemático</div>
                                     <div class="form-check">
@@ -504,7 +626,7 @@ function extrairIdYouTube($url) {
                                 </div>
 
                                 <div class="criteria-box">
-                                    <div class="criteria-title">2. Tempo</div>
+                                    <div class="criteria-title">2. Tempo (necessário ser menor que 6 minutos)</div>
                                     <div class="form-check">
                                         <input class="form-check-input criteria-radio" type="radio" id="tempo_respeitado_sim" name="tempo_status" value="1" data-comment-id="comentario_tempo">
                                         <label class="form-check-label" for="tempo_respeitado_sim">
@@ -523,7 +645,6 @@ function extrairIdYouTube($url) {
                                     </div>
                                 </div>
 
-                                <!-- Adicione os outros critérios seguindo o mesmo padrão -->
                                 <div class="criteria-box">
                                     <div class="criteria-title">3. Elementos Obrigatórios</div>
 
@@ -681,12 +802,11 @@ function extrairIdYouTube($url) {
                                 </div>
 
                                 <button type="submit" name="avaliar" class="btn btn-primary btn-lg">Enviar Avaliação</button>
-                                <a href="index.php" class="btn btn-secondary btn-lg">Cancelar</a>    <!-- AQUI ESTAVA dashboard.php -->
+                                <a href="index.php" class="btn btn-secondary btn-lg">Cancelar</a>
                             </form>
                         </div>
                     </div>
                 <?php else: ?>
-                    <!-- Lista de Vídeos Pendentes -->
                     <div class="card">
                         <div class="card-header card-header-custom-purple text-white">
                             <h5 class="mb-0">Vídeos Pendentes de Avaliação</h5>
@@ -695,7 +815,7 @@ function extrairIdYouTube($url) {
                             <?php if (!empty($videos_pendentes)): ?>
                                 <div class="list-group">
                                     <?php foreach ($videos_pendentes as $video): ?>
-                                        <a href="?avaliar=<?= $video['id'] ?>&ano=2025" class="list-group-item list-group-item-action">
+                                        <a href="?avaliar=<?= $video['id'] ?>" class="list-group-item list-group-item-action">
                                             <div class="d-flex w-100 justify-content-between">
                                                 <h6 class="mb-1"><?php echo htmlspecialchars($video['titulo']); ?></h6>
                                                 <small><?php echo $video['created_at']; ?></small>
@@ -708,6 +828,11 @@ function extrairIdYouTube($url) {
                             <?php else: ?>
                                 <div class="alert alert-info">
                                     Nenhum vídeo pendente de avaliação no momento.
+                                    <?php if(empty($categorias_atribuidas_chaves)): ?>
+                                        <br>Verifique se você possui categorias de avaliação atribuídas pelo administrador.
+                                    <?php elseif(empty($categorias_para_sql_query)): ?>
+                                        <br>Não foram encontradas categorias válidas (novas ou antigas mapeadas) para buscar vídeos. Verifique as configurações de categoria.
+                                    <?php endif; ?>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -716,89 +841,105 @@ function extrairIdYouTube($url) {
             </main>
         </div>
     </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <!-- JavaScript -->
-    <script>
-    // Controlar campos de comentário baseados na seleção do radio
-    document.querySelectorAll('.criteria-radio').forEach(radio => {
-        radio.addEventListener('change', function() {
-            const commentId = this.dataset.commentId; // Pega o ID do textarea do atributo data-comment-id
-            const commentField = document.getElementById(commentId);
-
-            if (commentField) {
-                if (this.value === '1') { // Se a opção "SIM" (correto) for marcada
-                    commentField.disabled = true;
-                    commentField.required = false; // Não é obrigatório se está correto
-                    commentField.value = ''; // Opcional: Limpa o campo de comentário
-                    commentField.placeholder = "Não é necessário comentar se o critério foi cumprido.";
-                } else { // Se a opção "NÃO" (incorreto) for marcada (value === '0')
-                    commentField.disabled = false;
-                    commentField.required = true; // Obrigatório se está incorreto
-                    commentField.placeholder = "Escreva aqui o motivo pelo qual não cumpre o critério.";
-                }
-            }
-        });
-
-        // Disparar o evento 'change' inicialmente para configurar os campos na carga da página
-        // Isso garante que os textareas com radios "NÃO" marcados por padrão estejam habilitados
-        if (radio.checked) {
-            radio.dispatchEvent(new Event('change'));
-        }
-    });
-    </script>
 
 <script>
+// Controlar campos de comentário baseados na seleção do radio
+document.querySelectorAll('.criteria-radio').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const commentId = this.dataset.commentId;
+        const commentField = document.getElementById(commentId);
+
+        if (commentField) {
+            if (this.value === '1') { // Se a opção "SIM" (correto/aplicável) for marcada
+                commentField.disabled = true;
+                commentField.required = false;
+                commentField.value = '';
+                commentField.placeholder = "Não é necessário comentar se o critério foi cumprido.";
+            } else { // Se a opção "NÃO" (incorreto/não aplicável) for marcada (value === '0')
+                commentField.disabled = false;
+                commentField.required = true;
+                commentField.placeholder = "Escreva aqui o motivo pelo qual não cumpre o critério.";
+            }
+        }
+    });
+});
+
 // Função para converter duração ISO 8601 para segundos
 function convertYouTubeDuration(duration) {
     const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+    if (!match) return 0; // Retorna 0 se o formato da duração for inesperado
     const hours = (parseInt(match[1]) || 0);
     const minutes = (parseInt(match[2]) || 0);
     const seconds = (parseInt(match[3]) || 0);
     return hours * 3600 + minutes * 60 + seconds;
 }
 
-// Função principal que verifica a duração
+// Função principal que verifica a duração do vídeo do YouTube
 async function checkVideoDuration(videoId, apiKey) {
+    const tempoRespeitadoNao = document.getElementById('tempo_respeitado_nao');
+    const comentarioTempo = document.getElementById('comentario_tempo');
+    const tempoRespeitadoSim = document.getElementById('tempo_respeitado_sim');
+
+    // Garante que todos os elementos necessários do formulário de tempo existam
+    if (!tempoRespeitadoNao || !comentarioTempo || !tempoRespeitadoSim) {
+        // console.warn("Um ou mais elementos do formulário de tempo não foram encontrados. Verificação de duração ignorada.");
+        return;
+    }
+
     try {
         const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails&key=${apiKey}`);
+        if (!response.ok) {
+            // console.error(`Erro na API do YouTube: ${response.status} ${response.statusText}`);
+            // Silenciosamente falha ou pode-se adicionar um feedback visual discreto se necessário
+            return;
+        }
         const data = await response.json();
         
         if (data.items && data.items.length > 0) {
-            const duration = data.items[0].contentDetails.duration;
-            const totalSeconds = convertYouTubeDuration(duration);
-            const totalMinutes = Math.floor(totalSeconds / 60); // Arredonda para 0 decimal
-            const segundosRestantes = totalSeconds - Math.floor(totalSeconds / 60)*60;
+            const durationISO = data.items[0].contentDetails.duration;
+            const totalSeconds = convertYouTubeDuration(durationISO);
             
-            if (totalSeconds > 360) { // 6 minutos = 360 segundos
-                // Marca o rádio "NÃO respeita"
-                document.getElementById('tempo_respeitado_nao').checked = true;
-                
-                // Preenche o comentário automaticamente
-                document.getElementById('comentario_tempo').value = 
-                    `O tempo total é de ${totalMinutes} minutos e ${segundosRestantes} segundos (limite: 6 minutos)`;
-                
-                // Dispara evento para validação (se necessário)
-                document.querySelector('input[name="tempo_status"]:checked').dispatchEvent(new Event('change'));
+            // Regulamento: vídeos de até 6 minutos (360 segundos)
+            if (totalSeconds > 360) {
+                tempoRespeitadoNao.checked = true;
+                const totalMinutesDisplay = Math.floor(totalSeconds / 60);
+                const segundosRestantesDisplay = totalSeconds % 60;
+                comentarioTempo.value = `O tempo total é de ${totalMinutesDisplay} minutos e ${segundosRestantesDisplay} segundos (limite: 6 minutos).`;
+                tempoRespeitadoNao.dispatchEvent(new Event('change')); // Dispara o evento para atualizar o estado do comentário
             } else {
-                document.getElementById('tempo_respeitado_sim').checked = true;
+                tempoRespeitadoSim.checked = true;
+                tempoRespeitadoSim.dispatchEvent(new Event('change')); // Dispara o evento
             }
+        } else {
+            // console.warn("Não foram encontrados detalhes para o vídeo ID:", videoId);
         }
     } catch (error) {
-        console.error('Erro ao verificar duração:', error);
-        // Pode adicionar tratamento de erro visual aqui
+        // console.error('Erro ao verificar duração do vídeo:', error);
     }
 }
 
-// Exemplo de uso (substitua com seus valores reais)
-const videoId = '<?= extrairIdYouTube($video_atual['link_youtube']) ?>'; // ID do vídeo ou variável PHP
-const apiKey = '<?= $apikey_youtube ?>'; // Sua chave de API youtube
+// Obtém o ID do vídeo e a chave da API do PHP (apenas se $video_atual estiver definido)
+const videoIdForDurationCheck = '<?= isset($video_atual) && $video_atual && isset($video_atual['link_youtube']) ? extrairIdYouTube($video_atual['link_youtube']) : "" ?>';
+const apiKeyForDurationCheck = '<?= $apikey_youtube ?? "" ?>'; // Garante que $apikey_youtube esteja definida no PHP
 
-// Chama a função quando a página carregar
 document.addEventListener('DOMContentLoaded', function() {
-    checkVideoDuration(videoId, apiKey);
-});
-</script>
+    // Executa a verificação da duração do vídeo apenas se o formulário de avaliação estiver presente
+    if (videoIdForDurationCheck && apiKeyForDurationCheck) {
+        checkVideoDuration(videoIdForDurationCheck, apiKeyForDurationCheck);
+    }
 
-</div>
+    // Garante que o estado inicial dos campos de comentário esteja correto com base nos rádios checados
+    document.querySelectorAll('.criteria-radio').forEach(radio => {
+        if (radio.checked) {
+            radio.dispatchEvent(new Event('change'));
+        }
+    });
+});
+</script> 
+
     <!-- Footer -->
     <?php include '../includes/footer.php'; ?>
 </body>
