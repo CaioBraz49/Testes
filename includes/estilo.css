@@ -1,0 +1,132 @@
+body {
+    display: grid;
+    grid-template-rows: auto 1fr auto; /* Cabeçalho, Conteúdo, Rodapé */
+    min-height: 100vh;
+}
+
+header {
+    grid-row: 1;
+}
+
+.content-wrapper {
+    grid-row: 2;
+}
+
+.rodape {
+    grid-row: 3;
+}
+
+
+/* Sobrescrevendo o botão primário do Bootstrap para ser roxo */
+.btn-primary {
+  background-color: #6f42c1 !important;
+  border-color: #6f42c1 !important;
+  color: white !important; /* Garante que o texto seja branco */
+}
+
+.btn-primary:hover {
+  background-color: #59369b !important;
+  border-color: #53338d !important;
+  color: white !important;
+}
+
+/* Estilo para o header com fundo roxo claro */
+.header-custom-light-purple {
+  background-color: #fff5fc; /* Exemplo: Roxo/lilás bem claro. Escolha a cor exata que desejar. */
+  /* Você pode adicionar outras propriedades se necessário, como cor do texto se não for herdada corretamente */
+  /* color: #333; */ /* Exemplo se precisar definir cor do texto */
+}
+
+/* Você pode querer ajustar o foco e o estado ativo também */
+.btn-primary:focus, .btn-primary.focus {
+  box-shadow: 0 0 0 0.2rem rgba(111, 66, 193, 0.5) !important; /* Sombra roxa */
+}
+
+.btn-primary:active, .btn-primary.active,
+.show > .btn-primary.dropdown-toggle {
+  background-color: #53338d !important;
+  border-color: #4d2f80 !important;
+  color: white !important;
+}
+
+/* Para o alerta de informações (status de avaliações) */
+.alert-info {
+  background-color: #e9d8fd !important; /* Um roxo/lilás bem claro para o fundo do alerta */
+  border-color: #d3b0f9 !important;     /* Borda em tom roxo um pouco mais escuro */
+  color: #53338d !important;           /* Texto em roxo escuro para contraste */
+}
+
+.alert-info strong { /* Para dar destaque ao texto em negrito dentro do alerta */
+  color: #4d2f80 !important;
+}
+
+/* Para o cabeçalho do card de "Vídeos Pendentes" e outros bg-primary */
+.bg-primary { /* Se você quiser que TODO bg-primary seja roxo */
+  background-color: #6f42c1 !important; /* Seu roxo principal */
+}
+/* Se o texto dentro do .bg-primary precisar mudar (já é text-white, o que deve funcionar bem com fundo roxo) */
+/* .bg-primary.text-white, .bg-primary .text-white {
+  color: #ffffff !important;
+} */
+
+/* Estilo para cabeçalho de card com fundo roxo claro */
+.card-header-custom-light-purple {
+  background-color: #ffecf9 !important; /* Seu "roxo quase branco" ou outro tom de roxo claro */
+  /* Se o texto padrão do card-header (geralmente escuro) ficar ruim com o fundo, ajuste: */
+  /* color: #your-preferred-text-color; */
+  /* A borda inferior do card-header geralmente é sutil, mas pode ser ajustada se necessário */
+  /* border-bottom: 1px solid #e0c3f7; */
+}
+
+/* festival/includes/estilo.css */
+
+.card-custom-light-purple-bg {
+  background-color: #9f4bff1f !important; 
+  /* Se precisar ajustar a cor do texto dentro destes cards: */
+  /* color: #333; */
+  /* Você pode querer manter as bordas padrão do card ou personalizá-las */
+  /* border: 1px solid #e0c3f7; */
+}
+/* Se quiser que apenas o corpo do card tenha o fundo roxo claro:
+.card-body-custom-light-purple {
+  background-color: #f2e6ff;
+}
+*/
+
+/* Para o cabeçalho "Acesso ao Sistema" */
+.card-header-custom-purple {
+  background-color: #6f42c1 !important; /* Cor roxa */
+  color: white; /* Mantém o texto branco, como no original */
+}
+
+/* Para o botão "Entrar" */
+.btn-custom-purple {
+  background-color: #6f42c1 !important; /* Cor roxa */
+  border-color: #6f42c1 !important;   /* Cor da borda roxa */
+  color: white;                       /* Cor do texto branca */
+}
+
+/* Opcional: Estilo para quando o mouse passa por cima do botão */
+.btn-custom-purple:hover {
+  background-color: #59369b !important; /* Um tom de roxo mais escuro */
+  border-color: #53338d !important;   /* Cor da borda mais escura */
+  color: white;
+}
+
+.badge-aprovado {
+  background-color: #28a745 !important; /* Verde (Bootstrap success color) */
+  color: white !important; /* Texto branco */
+}
+
+.badge-reprovado {
+  background-color: #cf3141 !important; /* Vermelho (Bootstrap danger color) */
+  color: white !important; /* Texto branco */
+}
+.badge-pendente {
+  background-color: #ff830f !important; /* Cinza (Bootstrap secondary color) */
+  color: white !important;
+}
+.badge-reavaliar { 
+  background-color: #ffd24d; /* Amarelo Bootstrap */
+  color: #212529; /* Texto escuro para contraste com amarelo */
+}
