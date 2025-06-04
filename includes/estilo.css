@@ -19,7 +19,7 @@ header {
 
 /* Sobrescrevendo o botão primário do Bootstrap para ser roxo */
 .btn-primary {
-  background-color: #6f42c1 !important;
+  background-color: #4C78DF !important;
   border-color: #6f42c1 !important;
   color: white !important; /* Garante que o texto seja branco */
 }
@@ -71,7 +71,7 @@ header {
 
 /* Estilo para cabeçalho de card com fundo roxo claro */
 .card-header-custom-light-purple {
-  background-color: #ffecf9 !important; /* Seu "roxo quase branco" ou outro tom de roxo claro */
+  background-color: #9942C2 !important; /* Seu "roxo quase branco" ou outro tom de roxo claro */
   /* Se o texto padrão do card-header (geralmente escuro) ficar ruim com o fundo, ajuste: */
   /* color: #your-preferred-text-color; */
   /* A borda inferior do card-header geralmente é sutil, mas pode ser ajustada se necessário */
@@ -81,7 +81,7 @@ header {
 /* festival/includes/estilo.css */
 
 .card-custom-light-purple-bg {
-  background-color: #9f4bff1f !important; 
+  background-color: #d499ce9b !important; 
   /* Se precisar ajustar a cor do texto dentro destes cards: */
   /* color: #333; */
   /* Você pode querer manter as bordas padrão do card ou personalizá-las */

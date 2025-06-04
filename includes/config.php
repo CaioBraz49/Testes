@@ -30,6 +30,7 @@ foreach ($requiredVars as $var) {
 }
 
 // Atribuições seguras
+$apikey_youtube = $env['FEST_APIKEY_YOUTUBE'] ?? '';
 $host = $env['FEST_DB_HOST'] ?? '';
 $dbname = $env['FEST_DB_DBNAME'] ?? '';
 $username = $env['FEST_DB_USERNAME'] ?? '';
